@@ -263,12 +263,11 @@ def compute_heading_reward(root_pos, prev_root_pos, root_rot, tar_dir, tar_speed
     tar_dir_vel = tar_dir_speed.unsqueeze(-1) * tar_dir
     tangent_vel = root_vel[..., :2] - tar_dir_vel
 
-    tangent_speed = torch.sum(tangent_vel, dim=-1)
+    tangent_vel_err = torch.sum(torch.square(tangent_vel), dim=-1)
 
     tar_vel_err = tar_speed - tar_dir_speed
-    tangent_vel_err = tangent_speed
     dir_reward = torch.exp(-vel_err_scale * (tar_vel_err * tar_vel_err + 
-                        tangent_err_w * tangent_vel_err * tangent_vel_err))
+                        tangent_err_w * tangent_vel_err))
 
     speed_mask = tar_dir_speed <= 0
     dir_reward[speed_mask] = 0
