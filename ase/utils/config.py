@@ -144,6 +144,12 @@ def parse_sim_params(args, cfg, cfg_train):
     sim_params.use_gpu_pipeline = args.use_gpu_pipeline
     sim_params.physx.use_gpu = args.use_gpu
 
+    # use smpl model
+    sim_params.up_axis = gymapi.UP_AXIS_Z
+    sim_params.gravity.x = 0
+    sim_params.gravity.y = 0
+    sim_params.gravity.z = -9.81
+
     # if sim options are provided in cfg, parse them and update/override above:
     if "sim" in cfg:
         gymutil.parse_sim_config(cfg["sim"], sim_params)
