@@ -73,7 +73,6 @@ params:
     grad_norm: 1.0
     entropy_coef: 0.0
     truncate_grads: False
-    ppo: True
     e_clip: 0.2
     horizon_length: 32
     minibatch_size: 1
@@ -98,12 +97,12 @@ params:
     latent_dim: 64
     latent_steps_min: 1
     latent_steps_max: 150
-    
+
     amp_latent_grad_bonus: 0.00
     amp_latent_grad_bonus_max: 100.0
     amp_diversity_bonus: 0.01
     amp_diversity_tar: 1.0
-    
+
     enc_coef: 5
     enc_weight_decay: 0.0000
     enc_reward_scale: 1

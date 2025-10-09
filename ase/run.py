@@ -174,9 +174,21 @@ def main():
     global cfg
     global cfg_train
 
+    IS_LOCAL = True
+
     set_np_formatting()
     args = get_args()
     cfg, cfg_train, logdir = load_cfg(args)
+
+    if IS_LOCAL:
+        cfg['env']['num_envs'] = 1
+        cfg['env']['stateInit'] = 'Default'
+        cfg_train['params']['config']['horizon_length'] = 4
+        cfg_train['params']['config']['minibatch_size'] = 4
+        cfg_train['params']['config']['amp_batch_size'] = 1
+        cfg_train['params']['config']['amp_minibatch_size'] = 4
+        cfg_train['params']['config']['amp_obs_demo_buffer_size'] = 20
+        cfg_train['params']['config']['amp_replay_buffer_size'] = 20
 
     cfg_train['params']['seed'] = set_seed(cfg_train['params'].get("seed", -1), cfg_train['params'].get("torch_deterministic", False))
 

@@ -25,7 +25,7 @@
             ],
         },
         {
-            "name": "Debug amp train",
+            "name": "Debug view motion",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/ase/run.py",
@@ -33,7 +33,9 @@
             "python": "/home/hlz/anaconda3/envs/phc/bin/python",
             "args": [
                 "--task",
-                "HumanoidAMP",
+                "HumanoidViewMotion",
+                "--num_envs",
+                "2",
                 "--cfg_env",
                 "ase/data/cfg/humanoid_sword_shield.yaml",
                 "--cfg_train",
@@ -53,11 +55,11 @@
                 "--task",
                 "HumanoidAMP",
                 "--cfg_env",
-                "ase/data/cfg/humanoid_smpl.yaml",
+                "ase/data/cfg/humanoid_ase_sword_shield.yaml",
                 "--cfg_train",
-                "ase/data/cfg/train/rlg/amp_humanoid.yaml",
+                "ase/data/cfg/train/rlg/ase_humanoid.yaml",
                 "--motion_file",
-                "ase/data/motions/reallusion_sword_shield/RL_Avatar_Atk_2xCombo01_Motion.npy",
+                "ase/data/motions/reallusion_sword_shield/dataset_reallusion_sword_shield.yaml",
             ],
         }
     ]
