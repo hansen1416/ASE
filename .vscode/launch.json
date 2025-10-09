@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "Debug eval",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/ase/run.py",
             "console": "integratedTerminal",
@@ -26,7 +26,7 @@
         },
         {
             "name": "Debug amp train",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/ase/run.py",
             "console": "integratedTerminal",
@@ -44,7 +44,7 @@
         },
         {
             "name": "Debug smpl amp train",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/ase/run.py",
             "console": "integratedTerminal",

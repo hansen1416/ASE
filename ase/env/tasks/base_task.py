@@ -35,7 +35,7 @@ class BaseTask():
         self.num_obs = cfg["env"]["numObservations"]
         self.num_states = cfg["env"].get("numStates", 0)
         self.num_actions = cfg["env"]["numActions"]
-
+        # the agent acts every step.
         self.control_freq_inv = cfg["env"].get("controlFrequencyInv", 1)
 
         # optimization flags for pytorch JIT
