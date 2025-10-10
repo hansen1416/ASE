@@ -114,6 +114,51 @@ class HumanoidAMP(Humanoid):
             self._num_amp_obs_per_step = 13 + self._dof_obs_size + 28 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
         elif (asset_file == "mjcf/amp_humanoid_sword_shield.xml"):
             self._num_amp_obs_per_step = 13 + self._dof_obs_size + 31 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
+        elif (asset_file == "mjcf/smpl_humanoid.xml"):
+            # some conditions borrowed from PHC
+            # Use AMP observation version 1 (basic key-body positions only)
+            self.amp_obs_v = 1
+            # Include root height in AMP observations
+            self._amp_root_height_obs = True
+            # Use a subset of degrees of freedom instead of all joints
+            self._has_dof_subset = True
+            # Do not include discrete shape parameters
+            self._has_shape_obs_disc = False
+            # Do not include discrete limb length/weight features
+            self._has_limb_weight_obs_disc = False
+
+            remove_names = ["L_Hand", "R_Hand", "L_Toe", "R_Toe"]
+            disc_idxes = []
+
+            for idx, name in enumerate(self._dof_names):
+                if not name in remove_names:
+                    disc_idxes.append(np.arange(idx * 3, (idx + 1) * 3))
+            
+            if len(disc_idxes) > 0:
+                self.dof_subset = torch.from_numpy(np.concatenate(disc_idxes)) 
+            else: 
+                torch.tensor([]).long()
+
+            if self.amp_obs_v == 1:
+                self._num_amp_obs_per_step = 13 + self._dof_obs_size + len(self._dof_names) * 3 + 3 * num_key_bodies  # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
+            else:
+                self._num_amp_obs_per_step = 13 + self._dof_obs_size + len(self._dof_names) * 3 + 6 * num_key_bodies  # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, key_body_vel]
+
+            if not self._amp_root_height_obs:
+                self._num_amp_obs_per_step -= 1
+
+            if self._has_dof_subset:
+                self._num_amp_obs_per_step -= (6 + 3) * int((len(self._dof_names) * 3 - len(self.dof_subset)) / 3)
+
+            if self._has_shape_obs_disc:
+                self._num_amp_obs_per_step += 11
+            
+            if self._has_limb_weight_obs_disc:
+                self._num_amp_obs_per_step += 10
+
+            # 196
+            # print(self._num_amp_obs_per_step)
+
         else:
             print("Unsupported character config file: {s}".format(asset_file))
             assert(False)

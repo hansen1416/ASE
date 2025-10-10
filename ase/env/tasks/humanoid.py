@@ -10,6 +10,13 @@ from utils import torch_utils
 
 from env.tasks.base_task import BaseTask
 
+SMPL_MUJOCO_NAMES = ['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 
+                     'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Hand']
+SMPLH_MUJOCO_NAMES = ['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 
+                      'L_Wrist', 'L_Index1', 'L_Index2', 'L_Index3', 'L_Middle1', 'L_Middle2', 'L_Middle3', 'L_Pinky1', 'L_Pinky2', 'L_Pinky3', 'L_Ring1', 'L_Ring2', 'L_Ring3', 'L_Thumb1', 'L_Thumb2', 'L_Thumb3', 
+                      'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Index1', 'R_Index2', 'R_Index3', 'R_Middle1', 'R_Middle2', 'R_Middle3', 'R_Pinky1', 'R_Pinky2', 'R_Pinky3', 'R_Ring1', 'R_Ring2', 'R_Ring3', 'R_Thumb1', 'R_Thumb2', 'R_Thumb3']
+
+
 class Humanoid(BaseTask):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self.cfg = cfg
@@ -50,8 +57,15 @@ class Humanoid(BaseTask):
         rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
         contact_force_tensor = self.gym.acquire_net_contact_force_tensor(self.sim)
 
-        sensors_per_env = 2
-        self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
+        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+
+        if (asset_file == "mjcf/smpl_humanoid.xml"):
+            self.force_sensor_joints = cfg["env"].get("force_sensor_joints", ["L_Ankle", "R_Ankle"]) # force tensor joints
+            sensors_per_env = len(self.force_sensor_joints)
+            self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
+        else:
+            sensors_per_env = 2
+            self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
 
         dof_force_tensor = self.gym.acquire_dof_force_tensor(self.sim)
         self.dof_force_tensor = gymtorch.wrap_tensor(dof_force_tensor).view(self.num_envs, self.num_dof)
@@ -64,6 +78,10 @@ class Humanoid(BaseTask):
         self._root_states = gymtorch.wrap_tensor(actor_root_state)
         num_actors = self.get_num_actors_per_env()
         
+        # is a view (no copy) that reshapes self._root_states to [num_envs, num_actors_per_env, 13] 
+        # and then selects the 0-th actor per env (the humanoid):
+        # Because it is a view, in-place writes to self._humanoid_root_states[:, 0:3/3:7/…] 
+        # directly modify the corresponding slice of self._root_states.
         self._humanoid_root_states = self._root_states.view(self.num_envs, num_actors, actor_root_state.shape[-1])[..., 0, :]
         self._initial_humanoid_root_states = self._humanoid_root_states.clone()
         self._initial_humanoid_root_states[:, 7:13] = 0
@@ -194,6 +212,48 @@ class Humanoid(BaseTask):
             self._num_actions = 31
             self._num_obs = 1 + 17 * (3 + 6 + 3 + 3) - 3
 
+        elif (asset_file == "mjcf/smpl_humanoid.xml"):
+
+            self._body_names = SMPL_MUJOCO_NAMES
+            self._dof_names = self._body_names[1:]
+            self.humanoid_type = "smpl"
+            # ankle joints are the lowest articulated joints
+            # self.force_sensor_joints = ["L_Ankle", "R_Ankle"]
+
+            self._dof_body_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+            self._dof_offsets = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69]
+
+            self._dof_obs_size = len(self._dof_names) * 6
+            self._dof_size = len(self._dof_names) * 3
+
+            self._num_actions = len(self._dof_names) * 3
+
+            # some conditions for `self._num_obs`, burrowed from PHC
+            self._has_shape_obs = False
+            self._has_limb_weight_obs = False
+            self._root_height_obs = True
+            self.self_obs_v = 1
+
+            # height + num_bodies * 15 (pos + vel + rot + ang_vel) - root_pos
+            self._num_obs = 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3  
+
+            if self._has_shape_obs:
+                if self.humanoid_type in ["smpl"]:
+                    self._num_obs += 11
+                elif self.humanoid_type in ["smplh", "smplx"]:
+                    self._num_obs += 17
+                    
+            # if self._has_limb_weight_obs: self._num_obs += 23 + 24 
+            # if not self._masterfoot else  29 + 30 # 23 + 24 (length + weight)
+            if self._has_limb_weight_obs:
+                self._num_obs += 10
+
+            if not self._root_height_obs:
+                self._num_obs -= 1
+            
+            if self.self_obs_v == 3:
+                self._num_obs += 6 * len(self.force_sensor_joints)
+
         else:
             print("Unsupported character config file: {s}".format(asset_file))
             assert(False)
@@ -239,9 +299,15 @@ class Humanoid(BaseTask):
         actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
         motor_efforts = [prop.motor_effort for prop in actuator_props]
         
+        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+
         # create force sensors at the feet
-        right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "right_foot")
-        left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "left_foot")
+        if (asset_file == "mjcf/smpl_humanoid.xml"):
+            right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
+            left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
+        else:
+            right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "right_foot")
+            left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "left_foot")
         sensor_pose = gymapi.Transform()
 
         self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
