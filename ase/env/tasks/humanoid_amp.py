@@ -1,6 +1,8 @@
+import os
 from enum import Enum
 import numpy as np
 import torch
+from easydict import EasyDict
 
 from isaacgym import gymapi
 from isaacgym import gymtorch
@@ -8,8 +10,9 @@ from isaacgym import gymtorch
 from env.tasks.humanoid import Humanoid, dof_to_obs
 from utils import gym_util
 from utils.motion_lib import MotionLib
+from utils.motion_lib_smpl import MotionLibSMPL
 from isaacgym.torch_utils import *
-
+from poselib.poselib.skeleton.skeleton3d import SkeletonTree
 from utils import torch_utils
 
 class HumanoidAMP(Humanoid):
@@ -121,7 +124,7 @@ class HumanoidAMP(Humanoid):
             # Include root height in AMP observations
             self._amp_root_height_obs = True
             # Use a subset of degrees of freedom instead of all joints
-            self._has_dof_subset = True
+            self._has_dof_subset = False
             # Do not include discrete shape parameters
             self._has_shape_obs_disc = False
             # Do not include discrete limb length/weight features
@@ -167,7 +170,42 @@ class HumanoidAMP(Humanoid):
 
     def _load_motion(self, motion_file):
         assert(self._dof_offsets[-1] == self.num_dof)
-        self._motion_lib = MotionLib(motion_file=motion_file,
+
+        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+
+        if (asset_file == "mjcf/smpl_humanoid.xml"):
+
+            asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file)
+            sk_tree = SkeletonTree.from_mjcf(asset_file_full)
+
+            gender_beta = np.zeros(17)
+            num_envs = self.cfg["env"]["numEnvs"]
+
+            humanoid_shapes = torch.tensor(np.array([gender_beta] * num_envs)).float().to(self.device)
+
+            motion_lib_cfg = EasyDict({
+                "motion_file": motion_file,
+                "device": torch.device("cpu"),
+                "fix_height": 1,
+                "min_length": -1,
+                "max_length": -1,
+                "im_eval": True,
+                "multi_thread": False,
+                "smpl_type": "smpl",
+                "randomrize_heading": True,
+                "device": self.device,
+                "min_length": -1, 
+                "step_dt": 1/60,
+                "key_body_ids": self._key_body_ids
+            })
+
+            self._motion_lib = MotionLibSMPL(motion_lib_cfg=motion_lib_cfg)
+
+            self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
+                        gender_betas=humanoid_shapes.cpu(), 
+                        random_sample=True)
+        else:
+            self._motion_lib = MotionLib(motion_file=motion_file,
                                      dof_body_ids=self._dof_body_ids,
                                      dof_offsets=self._dof_offsets,
                                      key_body_ids=self._key_body_ids.cpu().numpy(), 

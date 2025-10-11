@@ -49,6 +49,7 @@ motion_lib_cfg = EasyDict({
                 "device": device,
                 "min_length": -1, 
                 "step_dt": 1/60,
+                "key_body_ids": _key_body_ids
             })
 
 
@@ -63,7 +64,7 @@ motion_ids = motion_lib.sample_motions(num_envs)
 # tensor([2.9572], device='cuda:0')
 motion_times = motion_lib.sample_time(motion_ids, truncate_time=0.0)
 
-results = motion_lib.get_motion_state(motion_ids, motion_times, _key_body_ids)
+results = motion_lib.get_motion_state(motion_ids, motion_times)
 
 root_pos = results['root_pos']
 root_rot = results['root_rot']

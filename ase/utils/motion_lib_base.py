@@ -434,7 +434,7 @@ class MotionLibBase():
         else:
             return (self._motion_num_frames[motion_ids] * self._sim_fps / self._motion_fps).ceil().int()
 
-    def get_motion_state(self, motion_ids, motion_times, key_body_ids, offset=None):
+    def get_motion_state(self, motion_ids, motion_times, offset=None):
         n = len(motion_ids)
         num_bodies = self._get_num_bodies()
 
@@ -503,9 +503,9 @@ class MotionLibBase():
             body_vel[:, self.track_idx] = q_body_vel
             body_ang_vel[:, self.track_idx] = q_ang_vel
 
-        key_pos = rg_pos.index_select(dim=-2, index=key_body_ids)
+        key_pos = rg_pos.index_select(dim=-2, index=self.m_cfg.key_body_ids)
 
-        return {
+        results = {
             "root_pos": rg_pos[..., 0, :].clone(),
             "root_rot": rb_rot[..., 0, :].clone(),
             "dof_pos": dof_pos.clone(),
@@ -521,6 +521,16 @@ class MotionLibBase():
             "motion_bodies": self._motion_bodies[motion_ids],
             # "motion_limb_weights": self._motion_limb_weights[motion_ids],
         }
+    
+        root_pos = results['root_pos']
+        root_rot = results['root_rot']
+        dof_pos = results['dof_pos']
+        root_vel = results['root_vel']
+        root_ang_vel = results['root_ang_vel']
+        dof_vel = results['dof_vel']
+        key_pos = results['key_pos']
+
+        return root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos
 
     def get_root_pos_smpl(self, motion_ids, motion_times):
         n = len(motion_ids)
