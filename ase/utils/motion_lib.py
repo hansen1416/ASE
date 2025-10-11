@@ -10,7 +10,7 @@ from utils import torch_utils
 
 import torch
 
-USE_CACHE = True
+USE_CACHE = False
 print("MOVING MOTION DATA TO GPU, USING CACHE:", USE_CACHE)
 
 if not USE_CACHE:

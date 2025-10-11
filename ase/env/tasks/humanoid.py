@@ -196,7 +196,7 @@ class Humanoid(BaseTask):
 
     def _setup_character_props(self, key_bodies):
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
-        num_key_bodies = len(key_bodies)
+        # num_key_bodies = len(key_bodies)
 
         if (asset_file == "mjcf/amp_humanoid.xml"):
             self._dof_body_ids = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14]

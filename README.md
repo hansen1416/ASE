@@ -142,3 +142,8 @@ If you want to retarget new motion clips to the character, you can take a look a
 `python ase/run.py --task HumanoidAMPGetup --cfg_env ase/data/cfg/humanoid_ase_sword_shield_getup.yaml --cfg_train ase/data/cfg/train/rlg/ase_humanoid.yaml --motion_file ase/data/motions/reallusion_sword_shield/dataset_reallusion_sword_shield.yaml --headless`
 
 `pip install "protobuf==3.20.*"`
+
+
+`
+python ase/run.py --task HumanoidViewMotion --cfg_env ase/data/cfg/humanoid_ase.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/amp_humanoid_walk.yaml
+`
