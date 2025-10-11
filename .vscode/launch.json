@@ -85,7 +85,7 @@
             ],
         },
         {
-            "name": "Debug smpl amp train",
+            "name": "Debug train ase smpl",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/ase/run.py",
@@ -99,7 +99,7 @@
                 "--cfg_train",
                 "ase/data/cfg/train/rlg/ase_humanoid.yaml",
                 "--motion_file",
-                "ase/data/motions/reallusion_sword_shield/dataset_reallusion_sword_shield.yaml",
+                "ase/data/motions/amass/0-ACCAD_Female1General_c3d_A2-Sway_poses.pkl",
             ],
         }
     ]
