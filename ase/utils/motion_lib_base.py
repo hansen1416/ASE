@@ -154,6 +154,7 @@ class MotionLibBase():
             self._motion_data_keys = np.array(self._motion_data_load)
         
         self._num_unique_motions = len(self._motion_data_list)
+        
         if self.mode == MotionlibMode.directory:
             self._motion_data_load = joblib.load(self._motion_data_load[0]) # set self._motion_data_load to a sample of the data 
 
