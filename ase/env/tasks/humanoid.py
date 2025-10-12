@@ -59,7 +59,7 @@ class Humanoid(BaseTask):
 
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
-        if (asset_file == "mjcf/smpl_humanoid.xml"):
+        if asset_file.startswith("mjcf/smpl_"):
             self.force_sensor_joints = cfg["env"].get("force_sensor_joints", ["L_Ankle", "R_Ankle"]) # force tensor joints
             sensors_per_env = len(self.force_sensor_joints)
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
@@ -212,7 +212,7 @@ class Humanoid(BaseTask):
             self._num_actions = 31
             self._num_obs = 1 + 17 * (3 + 6 + 3 + 3) - 3
 
-        elif (asset_file == "mjcf/smpl_humanoid.xml"):
+        elif asset_file.startswith("mjcf/smpl_"):
 
             self._body_names = SMPL_MUJOCO_NAMES
             self._dof_names = self._body_names[1:]
@@ -302,7 +302,7 @@ class Humanoid(BaseTask):
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
         # create force sensors at the feet
-        if (asset_file == "mjcf/smpl_humanoid.xml"):
+        if asset_file.startswith("mjcf/smpl_"):
             right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
             left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
         else:
@@ -355,7 +355,6 @@ class Humanoid(BaseTask):
         segmentation_id = 0
 
         start_pose = gymapi.Transform()
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
         char_h = 0.89
 
         start_pose.p = gymapi.Vec3(*get_axis_params(char_h, self.up_axis_idx))

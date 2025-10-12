@@ -41,7 +41,7 @@
                 "--cfg_train",
                 "ase/data/cfg/train/rlg/amp_humanoid.yaml",
                 "--motion_file",
-                "ase/data/motions/amp_humanoid_walk.npy",
+                "ase/data/motions/amass/0-ACCAD_Female1General_c3d_A3-Swing_poses.pkl",
             ],
         },
         {

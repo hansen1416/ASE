@@ -117,7 +117,7 @@ class HumanoidAMP(Humanoid):
             self._num_amp_obs_per_step = 13 + self._dof_obs_size + 28 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
         elif (asset_file == "mjcf/amp_humanoid_sword_shield.xml"):
             self._num_amp_obs_per_step = 13 + self._dof_obs_size + 31 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
-        elif (asset_file == "mjcf/smpl_humanoid.xml"):
+        elif asset_file.startswith("mjcf/smpl_"):
             # some conditions borrowed from PHC
             # Use AMP observation version 1 (basic key-body positions only)
             self.amp_obs_v = 1
@@ -173,7 +173,7 @@ class HumanoidAMP(Humanoid):
 
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
-        if (asset_file == "mjcf/smpl_humanoid.xml"):
+        if asset_file.startswith("mjcf/smpl_"):
 
             asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file)
             sk_tree = SkeletonTree.from_mjcf(asset_file_full)
