@@ -181,9 +181,8 @@ def main():
     cfg, cfg_train, logdir = load_cfg(args)
 
     if IS_LOCAL:
-        cfg['env']['num_envs'] = 1
+        cfg['env']['numEnvs'] = 1
         cfg['env']['stateInit'] = 'Default'
-        cfg['env']['asset']['assetFileName'] = 'mjcf/smpl_humanoid.xml'
         cfg_train['params']['config']['horizon_length'] = 4
         cfg_train['params']['config']['minibatch_size'] = 4
         cfg_train['params']['config']['amp_batch_size'] = 1
