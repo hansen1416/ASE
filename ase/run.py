@@ -189,6 +189,7 @@ def main():
         cfg_train['params']['config']['amp_minibatch_size'] = 4
         cfg_train['params']['config']['amp_obs_demo_buffer_size'] = 20
         cfg_train['params']['config']['amp_replay_buffer_size'] = 20
+        cfg_train['params']['config']['num_actors'] = 1
 
     cfg_train['params']['seed'] = set_seed(cfg_train['params'].get("seed", -1), cfg_train['params'].get("torch_deterministic", False))
 
