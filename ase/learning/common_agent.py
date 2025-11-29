@@ -66,6 +66,9 @@ class CommonAgent(a2c_continuous.A2CAgent):
             self.central_value_net = central_value.CentralValueTrain(**cv_config).to(self.ppo_device)
 
         self.use_experimental_cv = self.config.get('use_experimental_cv', True)
+
+        print(f"start load dataset, batch_size: {self.batch_size}, minibatch_size: {self.minibatch_size}")
+
         self.dataset = amp_datasets.AMPDataset(self.batch_size, self.minibatch_size, self.is_discrete, self.is_rnn, self.ppo_device, self.seq_len)
         self.algo_observer.after_init(self)
         
@@ -94,6 +97,8 @@ class CommonAgent(a2c_continuous.A2CAgent):
         if self.multi_gpu:
             self.hvd.setup_algo(self)
 
+        print(f"Initialize training, save_freq: {self.save_freq}, max_epochs: {self.max_epochs}")
+
         self._init_train()
 
         while True:
@@ -114,7 +119,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 if self.print_stats:
                     fps_step = curr_frames / scaled_play_time
                     fps_total = curr_frames / scaled_time
-                    print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
+                    # print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
 
                 self.writer.add_scalar('performance/total_fps', curr_frames / scaled_time, frame)
                 self.writer.add_scalar('performance/step_fps', curr_frames / scaled_play_time, frame)
@@ -145,6 +150,23 @@ class CommonAgent(a2c_continuous.A2CAgent):
                         if (self._save_intermediate):
                             int_model_output_file = model_output_file + '_' + str(epoch_num).zfill(8)
                             self.save(int_model_output_file)
+
+                        # custom print log =======================
+                        log_parts = [f'fps step: {(curr_frames / scaled_play_time):.1f} fps total: {(curr_frames / scaled_time):.1f}']
+
+                        for i in range(self.value_size):
+                            log_parts.append(
+                                "rewards{0}/frame={1:.4f}, rewards{0}/iter={1:.4f}, rewards{0}/time={1:.4f}".format(
+                                    i, mean_rewards[i]
+                                )
+                            )
+
+                        log_parts.append("episode_lengths/frame={:.4f}".format(mean_lengths))
+                        log_parts.append("episode_lengths/iter={:.4f}".format(mean_lengths))
+
+                        log_str = " | ".join(log_parts)
+                        print(log_str)
+                        # custom print log =======================
 
                 if epoch_num > self.max_epochs:
                     self.save(model_output_file)
