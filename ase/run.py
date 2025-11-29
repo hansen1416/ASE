@@ -174,7 +174,7 @@ def main():
     global cfg
     global cfg_train
 
-    # IS_LOCAL = True
+    IS_LOCAL = True
     IS_LOCAL = False
 
     set_np_formatting()

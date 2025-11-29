@@ -3,5 +3,5 @@ python ase/run.py --task HumanoidAMP --cfg_env ase/data/cfg/humanoid_ase_smpl.ya
 `
 
 `
-python ase/run.py --task HumanoidAMP --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file /home/hlz/datasets/AMASS/pkls/0-ACCAD_MartialArtsWalksTurns_c3d_E15-blockleftmiddle_poses.pkl
+python ase/run.py --task HumanoidAMP --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/0-ACCAD_MartialArtsWalksTurns_c3d_E15-blockleftmiddle_poses.pkl
 `
