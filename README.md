@@ -145,14 +145,6 @@ If you want to retarget new motion clips to the character, you can take a look a
 
 `pip install "protobuf==3.20.*"`
 
-`
-python ase/run.py --task HumanoidAMP --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/amass/0-ACCAD_Female1Gestures_c3d_D6-CartWheel_poses.pkl --headless
-`
-
-`
-python ase/run.py --task HumanoidViewMotion --num_envs 2 --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/amass/0-ACCAD_Female1Gestures_c3d_D6-CartWheel_poses.pkl
-`
-
 ------------------
 
 find out how amp save motion result,
