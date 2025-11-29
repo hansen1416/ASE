@@ -3,4 +3,32 @@ Following instruction in `PHC/docs/docker_instruction.MD`
 
 -----------------------------
 
-docker run -it --mount type=bind,source=$HOME/repos/ASE,target=/home/gymuser/ASE --network=host --gpus=all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 hansen1416/phc /bin/bash
+> -i (--interactive): keeps STDIN open and attaches it to your terminal.
+
+> -t (--tty): allocates a pseudo-TTY so programs think they are in a real terminal.
+
+> Together -it means: run the container and immediately attach my terminal to its STDIN/TTY → Docker then attaches you directly into /bin/bash.
+
+> -d (--detach): run the container in the background and do not attach your terminal; Docker just prints the container ID and returns you to your shell.
+
+docker run -d \
+--mount type=bind,source=$HOME/repos/ASE,target=/home/gymuser/ASE \
+--network=host \
+--gpus=all \
+--ipc=host \
+--ulimit memlock=-1 \
+--ulimit stack=67108864 \
+hansen1416/phc \
+tail -f /dev/null
+
+docker run -d \
+--mount type=bind,source=$HOME/repos/ASE_origin,target=/home/gymuser/ASE \
+--network=host \
+--gpus=all \
+--ipc=host \
+--ulimit memlock=-1 \
+--ulimit stack=67108864 \
+hansen1416/phc \
+tail -f /dev/null
+
+docker exec -it <CONTAINER_ID> /bin/bash
