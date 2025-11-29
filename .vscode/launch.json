@@ -2,6 +2,26 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug amass smpl motion",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ase/run.py",
+            "console": "integratedTerminal",
+            "python": "/home/hlz/anaconda3/envs/phc/bin/python",
+            "args": [
+                "--task",
+                "HumanoidViewMotion",
+                "--num_envs",
+                "2",
+                "--cfg_env",
+                "ase/data/cfg/humanoid_ase_smpl.yaml",
+                "--cfg_train",
+                "ase/data/cfg/train/rlg/amp_humanoid.yaml",
+                "--motion_file",
+                "/home/hlz/datasets/AMASS/pkls/0-ACCAD_MartialArtsWalksTurns_c3d_E15-blockleftmiddle_poses.pkl",
+            ],
+        },
+        {
             "name": "Debug amp train",
             "type": "debugpy",
             "request": "launch",
