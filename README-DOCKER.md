@@ -22,7 +22,7 @@ hansen1416/phc \
 tail -f /dev/null
 
 docker run -d \
---mount type=bind,source=$HOME/repos/ASE_origin,target=/home/gymuser/ASE \
+--mount type=bind,source=/home/ASE,target=/home/gymuser/ASE \
 --network=host \
 --gpus=all \
 --ipc=host \
