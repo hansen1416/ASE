@@ -7,6 +7,15 @@ from env.tasks.humanoid_amp import HumanoidAMP
 
 class HumanoidViewMotion(HumanoidAMP):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
+        """
+        HumanoidViewMotion does not use physics-based joint torques. `cfg["env"]["pdControl"] = False`,
+
+        each pre_physics_step, it writes a zero force vector to the simulator 
+        `self.gym.set_dof_actuation_force_tensor(self.sim, force_tensor)`, meaning no torques are applied to the joints. 
+        
+        After physics advances, post_physics_step calls _motion_sync, which directly sets root pose and all joint positions from the motion library and zeroes velocities, 
+        `self.gym.set_actor_root_state_tensor_indexed`, `self.gym.set_dof_state_tensor_indexed`
+        """
         control_freq_inv = cfg["env"]["controlFrequencyInv"]
         self._motion_dt = control_freq_inv * sim_params.dt
 

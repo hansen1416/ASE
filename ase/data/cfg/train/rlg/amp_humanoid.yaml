@@ -12,6 +12,7 @@ params:
     separate: True
 
     space:
+      # Action head (μ/σ) behaviour
       continuous:
         mu_activation: None
         sigma_activation: None

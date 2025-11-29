@@ -153,4 +153,8 @@ python ase/run.py --task HumanoidAMP --cfg_env ase/data/cfg/humanoid_ase_smpl.ya
 python ase/run.py --task HumanoidViewMotion --num_envs 2 --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/amass/0-ACCAD_Female1Gestures_c3d_D6-CartWheel_poses.pkl
 `
 
-docker run -it --mount type=bind,source=$HOME/repos/ASE,target=/home/gymuser/ASE --network=host --gpus=all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 hansen1416/phc /bin/bash
+------------------
+
+find out how amp save motion result,
+try to play the motion in AMP settings.
+copy the red ball logic from phc

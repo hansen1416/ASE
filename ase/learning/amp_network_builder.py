@@ -25,6 +25,7 @@ class AMPBuilder(network_builder.A2CBuilder):
                     sigma_init(self.sigma)
                     
             amp_input_shape = kwargs.get('amp_input_shape')
+            # This is the place that adds the discriminator on top of the standard actor–critic.
             self._build_disc(amp_input_shape)
 
             return
