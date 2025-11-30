@@ -21,5 +21,5 @@ python ase/run.py --test --task HumanoidAMP --num_envs 16 --cfg_env ase/data/cfg
 `
 
 `
-python ase/run.py --test --task HumanoidAMP --num_envs 16 --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/0-ACCAD_Female1Running_c3d_C4-Runtowalk1_poses.pkl --checkpoint /home/hlz/Documents/amp_smpl/Humanoid_29-16-36-43/nn/Humanoid.pth
+python ase/run.py --test --task HumanoidAMP --num_envs 16 --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/0-ACCAD_Female1Running_c3d_C4-Runtowalk1_poses.pkl --checkpoint /home/hlz/Documents/ase-smpl-run-walk/Humanoid_30-12-08-46/nn/Humanoid_1850.pth
 `
