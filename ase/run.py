@@ -1,4 +1,4 @@
-import os
+import getpass
 
 from utils.config import set_np_formatting, set_seed, get_args, parse_sim_params, load_cfg
 from utils.parse_task import parse_task
@@ -174,14 +174,13 @@ def main():
     global cfg
     global cfg_train
 
-    IS_LOCAL = True
-    IS_LOCAL = False
-
     set_np_formatting()
     args = get_args()
     cfg, cfg_train, logdir = load_cfg(args)
 
-    if IS_LOCAL:
+    USER = getpass.getuser()
+
+    if USER == "hlz":
 
         num_actors = 4
 
