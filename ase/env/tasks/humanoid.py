@@ -57,9 +57,10 @@ class Humanoid(BaseTask):
         rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
         contact_force_tensor = self.gym.acquire_net_contact_force_tensor(self.sim)
 
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+        # multi humanoid template change ===============
+        asset_type = self.cfg["env"]["asset"]["assetType"]
 
-        if asset_file.startswith("mjcf/smpl_"):
+        if asset_type == "smpl":
             self.force_sensor_joints = cfg["env"].get("force_sensor_joints", ["L_Ankle", "R_Ankle"]) # force tensor joints
             sensors_per_env = len(self.force_sensor_joints)
             self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
@@ -195,8 +196,9 @@ class Humanoid(BaseTask):
         return
 
     def _setup_character_props(self, key_bodies):
+        # multi humanoid template change ===============
+        asset_type = self.cfg["env"]["asset"]["assetType"]
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
-        # num_key_bodies = len(key_bodies)
 
         if (asset_file == "mjcf/amp_humanoid.xml"):
             self._dof_body_ids = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14]
@@ -212,7 +214,7 @@ class Humanoid(BaseTask):
             self._num_actions = 31
             self._num_obs = 1 + 17 * (3 + 6 + 3 + 3) - 3
 
-        elif asset_file.startswith("mjcf/smpl_"):
+        elif asset_type == "smpl":
 
             self._body_names = SMPL_MUJOCO_NAMES
             self._dof_names = self._body_names[1:]
@@ -283,43 +285,110 @@ class Humanoid(BaseTask):
         upper = gymapi.Vec3(spacing, spacing, spacing)
 
         asset_root = self.cfg["env"]["asset"]["assetRoot"]
+        asset_type = self.cfg["env"]["asset"]["assetType"]
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
-
-        asset_path = os.path.join(asset_root, asset_file)
-        asset_root = os.path.dirname(asset_path)
-        asset_file = os.path.basename(asset_path)
 
         asset_options = gymapi.AssetOptions()
         asset_options.angular_damping = 0.01
         asset_options.max_angular_velocity = 100.0
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
-        #asset_options.fix_base_link = True
-        humanoid_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
 
-        actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
-        motor_efforts = [prop.motor_effort for prop in actuator_props]
-        
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+        # multi humanoid template change ===============
+        motor_efforts = None
 
-        # create force sensors at the feet
-        if asset_file.startswith("mjcf/smpl_"):
-            right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
-            left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
+        humanoid_assets = []
+
+        if asset_type == "smpl":
+
+            for i, af in enumerate(asset_file):
+
+                # asset_path = os.path.join(asset_root, af)
+                # asset_root = os.path.dirname(asset_path)
+
+                humanoid_asset = self.gym.load_asset(self.sim, asset_root, af, asset_options)
+
+                actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
+                curr_motor_efforts = [prop.motor_effort for prop in actuator_props]
+
+                right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
+                left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
+
+                sensor_pose = gymapi.Transform()
+
+                self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
+                self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
+
+                # sensor_count = self.gym.get_asset_force_sensor_count(humanoid_asset)
+                # if sensors_per_env is None:
+                #     sensors_per_env = sensor_count
+                # elif sensor_count != sensors_per_env:
+                #     raise ValueError("All humanoid assets must expose the same number of force sensors")
+
+                curr_num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
+                curr_num_dof = self.gym.get_asset_dof_count(humanoid_asset)
+                curr_num_joints = self.gym.get_asset_joint_count(humanoid_asset)
+
+                if i == 0:
+                    # the smpl type are of same rigid body and joints, so only take info from the first one
+
+                    motor_efforts = curr_motor_efforts
+
+                    self.max_motor_effort = max(motor_efforts)
+                    self.motor_efforts = to_torch(motor_efforts, device=self.device)
+   
+                    self.torso_index = 0
+                    self.num_bodies = curr_num_bodies
+                    self.num_dof = curr_num_dof
+                    self.num_joints = curr_num_joints
+
+                else:
+
+                    assert curr_num_bodies == self.num_bodies, f"diff num_bodies: {curr_num_bodies}, {self.num_bodies}, {af}, {i}"
+                    assert curr_num_dof == self.num_dof, f"diff num_bodies: {curr_num_dof}, {self.num_dof}"
+                    assert curr_num_joints == self.num_joints, f"diff num_bodies: {curr_num_joints}, {self.num_joints}"
+
+                    if len(curr_motor_efforts) != len(motor_efforts):
+                        raise ValueError("All humanoid assets must expose the same number of actuators")
+                    if not np.allclose(curr_motor_efforts, motor_efforts):
+                        raise ValueError("All humanoid assets must share identical actuator effort limits")
+
+                humanoid_assets.append(humanoid_asset)
+                
         else:
+
+            asset_path = os.path.join(asset_root, asset_file)
+            asset_root = os.path.dirname(asset_path)
+            asset_file = os.path.basename(asset_path)
+        
+            humanoid_assets = [self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)]
+
+            # the assets of the same rigid body and joints.
+            # so fer getting these information, we just use the first one
+            humanoid_asset = humanoid_assets[0]
+
+            actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
+            motor_efforts = [prop.motor_effort for prop in actuator_props]
+
+            # create force sensors at the feet
+            # if asset_file.startswith("mjcf/smpl_"):
             right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "right_foot")
             left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "left_foot")
-        sensor_pose = gymapi.Transform()
 
-        self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
-        self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
+            sensor_pose = gymapi.Transform()
 
-        self.max_motor_effort = max(motor_efforts)
-        self.motor_efforts = to_torch(motor_efforts, device=self.device)
+            self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
+            self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
 
-        self.torso_index = 0
-        self.num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
-        self.num_dof = self.gym.get_asset_dof_count(humanoid_asset)
-        self.num_joints = self.gym.get_asset_joint_count(humanoid_asset)
+            #asset_options.fix_base_link = True
+
+            self.max_motor_effort = max(motor_efforts)
+            self.motor_efforts = to_torch(motor_efforts, device=self.device)
+
+            self.torso_index = 0
+            self.num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
+            self.num_dof = self.gym.get_asset_dof_count(humanoid_asset)
+            self.num_joints = self.gym.get_asset_joint_count(humanoid_asset)
+        # multi humanoid template change ===============
 
         self.humanoid_handles = []
         self.envs = []
@@ -329,7 +398,13 @@ class Humanoid(BaseTask):
         for i in range(self.num_envs):
             # create env instance
             env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
-            self._build_env(i, env_ptr, humanoid_asset)
+            # multi humanoid template change ===============
+            m = len(humanoid_assets)
+
+            h_asset = humanoid_assets[i % m]
+
+            self._build_env(i, env_ptr, h_asset)
+            # multi humanoid template change ===============
             self.envs.append(env_ptr)
 
         dof_prop = self.gym.get_actor_dof_properties(self.envs[0], self.humanoid_handles[0])

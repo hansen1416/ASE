@@ -109,7 +109,8 @@ class HumanoidAMP(Humanoid):
         
     def _setup_character_props(self, key_bodies):
         super()._setup_character_props(key_bodies)
-
+        # multi humanoid template change ===============
+        asset_type = self.cfg["env"]["asset"]["assetType"]
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
         num_key_bodies = len(key_bodies)
 
@@ -117,7 +118,8 @@ class HumanoidAMP(Humanoid):
             self._num_amp_obs_per_step = 13 + self._dof_obs_size + 28 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
         elif (asset_file == "mjcf/amp_humanoid_sword_shield.xml"):
             self._num_amp_obs_per_step = 13 + self._dof_obs_size + 31 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
-        elif asset_file.startswith("mjcf/smpl_"):
+        elif asset_type == "smpl":
+            # asset_file.startswith("mjcf/smpl_"), it's a list of asset files
             # some conditions borrowed from PHC
             # Use AMP observation version 1 (basic key-body positions only)
             self.amp_obs_v = 1
@@ -171,11 +173,13 @@ class HumanoidAMP(Humanoid):
     def _load_motion(self, motion_file):
         assert(self._dof_offsets[-1] == self.num_dof)
 
+        # multi humanoid template change ===============
+        asset_type = self.cfg["env"]["asset"]["assetType"]
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
-        if asset_file.startswith("mjcf/smpl_"):
-
-            asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file)
+        if asset_type == "smpl":
+            # multi humanoid template change ===============
+            asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
             sk_tree = SkeletonTree.from_mjcf(asset_file_full)
 
             gender_beta = np.zeros(17)
