@@ -48,6 +48,7 @@ env:
     assetFileName:
       - "mjcf/smpl_humanoid.xml"
       - "mjcf/smpl_humanoid01.xml"
+      - "mjcf/smpl_humanoid1.xml"
 
   plane:
     staticFriction: 1.0
