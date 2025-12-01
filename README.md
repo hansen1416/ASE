@@ -150,3 +150,8 @@ If you want to retarget new motion clips to the character, you can take a look a
 find out how amp save motion result,
 try to play the motion in AMP settings.
 copy the red ball logic from phc
+
+use smpl sim to generate humanoid of different shapes and density, (shape follow the density)
+common_player -> amp_player; humanoid -> humanoid_amp; find out the initial position settings
+
+----
