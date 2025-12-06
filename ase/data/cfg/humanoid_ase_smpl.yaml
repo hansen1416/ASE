@@ -46,10 +46,10 @@ env:
     assetRoot: "ase/data/assets"
     assetType: "smpl"
     assetFileName:
-      - "mjcf/smpl/smpl_humanoid0.xml"
-      - "mjcf/smpl/smpl_humanoid1.xml"
-      - "mjcf/smpl/smpl_humanoid2.xml"
-      - "mjcf/smpl/smpl_humanoid3.xml"
+      - "mjcf/smpl/custom_simple2_neutral_0f8bb946.xml"
+      - "mjcf/smpl/custom_simple2_neutral_1bed6038.xml"
+      - "mjcf/smpl/custom_simple2_neutral_2b9837d9.xml"
+      - "mjcf/smpl/custom_simple2_neutral_3a9c99f1.xml"
 
   plane:
     staticFriction: 1.0
