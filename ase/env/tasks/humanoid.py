@@ -656,6 +656,9 @@ class Humanoid(BaseTask):
                 # 2) re-sync sim tensors after reset
                 self._refresh_sim_tensors()
 
+                # 3) rebuild observations for the reset envs
+                self._compute_observations(env_ids=bad_ids)
+
                 # 3) if AMP history exists, wipe it for those envs
                 if hasattr(self, "_amp_obs_buf"):
                     self._amp_obs_buf[bad_ids] = 0.0
