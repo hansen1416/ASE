@@ -629,6 +629,9 @@ class Humanoid(BaseTask):
         self.progress_buf += 1
 
         self._refresh_sim_tensors()
+        self._compute_observations()
+        self._compute_reward(self.actions)
+        self._compute_reset()
 
         # ---- debug: detect non-finite physics state ----
         if self.cfg["env"]["asset"]["assetType"] == "smpl":
@@ -653,10 +656,6 @@ class Humanoid(BaseTask):
                 # simplest short-term behaviour: reset those envs
                 self.reset(env_ids=bad_ids)
         # -----------------------------------------------
-
-        self._compute_observations()
-        self._compute_reward(self.actions)
-        self._compute_reset()
         
         self.extras["terminate"] = self._terminate_buf
 
