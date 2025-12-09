@@ -231,20 +231,21 @@ class Humanoid(BaseTask):
             self._num_actions = len(self._dof_names) * 3
 
             # some conditions for `self._num_obs`, burrowed from PHC
-            self._has_shape_obs = False
             self._has_limb_weight_obs = False
             self._root_height_obs = True
             self.self_obs_v = 1
 
             # height + num_bodies * 15 (pos + vel + rot + ang_vel) - root_pos
-            self._num_obs = 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3  
+            self._num_obs = 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3
 
-            if self._has_shape_obs:
-                if self.humanoid_type in ["smpl"]:
-                    self._num_obs += 11
-                elif self.humanoid_type in ["smplh", "smplx"]:
-                    self._num_obs += 17
-                    
+            # load beta into observation ===============
+            if self.humanoid_type in ["smpl"]:
+                self._num_obs += 10
+                # 368
+            elif self.humanoid_type in ["smplh", "smplx"]:
+                self._num_obs += 16
+            # load beta into observation ===============
+
             # if self._has_limb_weight_obs: self._num_obs += 23 + 24 
             # if not self._masterfoot else  29 + 30 # 23 + 24 (length + weight)
             if self._has_limb_weight_obs:
@@ -299,13 +300,30 @@ class Humanoid(BaseTask):
         humanoid_assets = []
 
         if asset_type == "smpl":
+            # load beta into observation ===============
+            template_betas = []   # <--- add this
+            # load beta into observation ===============
 
             for i, af in enumerate(asset_file):
 
-                # asset_path = os.path.join(asset_root, af)
-                # asset_root = os.path.dirname(asset_path)
-
                 humanoid_asset = self.gym.load_asset(self.sim, asset_root, af, asset_options)
+
+                # load beta into observation ===============
+                # load betas for this template
+                beta_rel_dir = os.path.dirname(af)                       # e.g. "mjcf/smpl"
+                smpl_stem = os.path.splitext(os.path.basename(af))[0]    # "a0f02530_smpl"
+                beta_prefix = smpl_stem.rsplit("_", 1)[0]                 # "a0f02530"
+                beta_filename = beta_prefix + "_betas.pt"                 # "a0f02530_betas.pt"
+                beta_path = os.path.join(asset_root, beta_rel_dir, beta_filename)
+
+                betas = torch.load(beta_path, weights_only=True)
+                # here the betas should be torch.Size([1, 10])
+                if len(betas.shape) > 1:
+                    betas = betas[0]
+
+                betas = torch.as_tensor(betas, dtype=torch.float32, device=self.device)
+                template_betas.append(betas)
+                # load beta into observation ===============
 
                 actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
                 curr_motor_efforts = [prop.motor_effort for prop in actuator_props]
@@ -353,7 +371,11 @@ class Humanoid(BaseTask):
                         raise ValueError("All humanoid assets must share identical actuator effort limits")
 
                 humanoid_assets.append(humanoid_asset)
-                
+            
+            # load beta into observation ===============
+            # torch.Size([64, 10])
+            self._template_betas = torch.stack(template_betas, dim=0)    # [T, B]
+            # load beta into observation ===============
         else:
 
             asset_path = os.path.join(asset_root, asset_file)
@@ -394,6 +416,14 @@ class Humanoid(BaseTask):
         self.envs = []
         self.dof_limits_lower = []
         self.dof_limits_upper = []
+
+        # load beta into observation ===============
+        # allocate per-env betas for smpl
+        if asset_type == "smpl":
+            beta_dim = self._template_betas.shape[1]
+            # torch.Size([2, 10]) [number_actors, betas]
+            self._betas_env = torch.zeros(self.num_envs, beta_dim, device=self.device)
+        # load beta into observation ===============
         
         for i in range(self.num_envs):
             # create env instance
@@ -402,6 +432,13 @@ class Humanoid(BaseTask):
             m = len(humanoid_assets)
 
             h_asset = humanoid_assets[i % m]
+
+            # load beta into observation ===============
+            # assign beta for this env when smpl is used
+            if asset_type == "smpl":
+                template_id = i % m
+                self._betas_env[i] = self._template_betas[template_id]
+            # load beta into observation ===============
 
             self._build_env(i, env_ptr, h_asset)
             # multi humanoid template change ===============
@@ -524,6 +561,17 @@ class Humanoid(BaseTask):
 
     def _compute_observations(self, env_ids=None):
         obs = self._compute_humanoid_obs(env_ids)
+
+        # load beta into observation ===============
+        # append shape betas for smpl assets
+        if self.cfg["env"]["asset"]["assetType"] == "smpl":
+            if env_ids is None:
+                betas = self._betas_env                        # [num_envs, B]
+            else:
+                betas = self._betas_env[env_ids]               # [len(env_ids), B]
+            obs = torch.cat([obs, betas], dim=-1)
+            # torch.Size([num_envs, 358]) -> torch.Size([num_envs, 368]), 10 betas
+        # load beta into observation ===============
 
         if (env_ids is None):
             self.obs_buf[:] = obs
