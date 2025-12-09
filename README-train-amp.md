@@ -1,5 +1,5 @@
 `
-python ase/run.py --task HumanoidAMP --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file ase/data/motions/0-ACCAD_Female1Running_c3d_C4-Runtowalk1_poses.pkl --headless
+python ase/run.py --task HumanoidAMP --cfg_env ase/data/cfg/humanoid_ase_smpl.yaml --cfg_train ase/data/cfg/train/rlg/amp_humanoid.yaml --motion_file /home/hlz/datasets/amass-pkls/0-ACCAD_Female1Running_c3d_C4-Runtowalk1_poses.pkl --headless
 `
 
 `

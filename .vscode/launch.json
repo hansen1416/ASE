@@ -22,7 +22,7 @@
             ],
         },
         {
-            "name": "Debug amp train",
+            "name": "Train amp",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/ase/run.py",
