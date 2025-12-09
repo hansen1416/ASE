@@ -57,6 +57,17 @@ class HumanoidAMP(Humanoid):
         self._compute_amp_observations()
 
         amp_obs_flat = self._amp_obs_buf.view(-1, self.get_num_amp_obs())
+
+        # ---- debug: detect non-finite physics state ----
+        if not torch.isfinite(amp_obs_flat).all():
+            bad_envs = ~torch.isfinite(amp_obs_flat).all(dim=1)
+            bad_ids = bad_envs.nonzero(as_tuple=False).flatten()
+            print("[DEBUG] non-finite amp_obs after reset; zeroing envs:", bad_ids.tolist())
+            self._amp_obs_buf[bad_ids] = 0.0
+            amp_obs_flat = self._amp_obs_buf.view(self.num_envs, -1)
+            assert torch.isfinite(amp_obs_flat).all()
+        # ---- debug: detect non-finite physics state ----
+
         self.extras["amp_obs"] = amp_obs_flat
 
         return

@@ -629,9 +629,6 @@ class Humanoid(BaseTask):
         self.progress_buf += 1
 
         self._refresh_sim_tensors()
-        self._compute_observations()
-        self._compute_reward(self.actions)
-        self._compute_reset()
 
         # ---- debug: detect non-finite physics state ----
         if self.cfg["env"]["asset"]["assetType"] == "smpl":
@@ -653,9 +650,26 @@ class Humanoid(BaseTask):
                     for e, t in zip(bad_ids.tolist(), tmpl_ids):
                         print(f"[DEBUG] env {e} uses asset {asset_files[t]}")
 
-                # simplest short-term behaviour: reset those envs
+                # 1) reset physics state
                 self.reset(env_ids=bad_ids)
+
+                # 2) re-sync sim tensors after reset
+                self._refresh_sim_tensors()
+
+                # 3) if AMP history exists, wipe it for those envs
+                if hasattr(self, "_amp_obs_buf"):
+                    self._amp_obs_buf[bad_ids] = 0.0
+
+                # 2) if this is actually HumanoidAMP, also wipe AMP history
+                #    so no NaNs remain in amp_obs_buf
+                if hasattr(self, "_amp_obs_buf"):
+                    # _amp_obs_buf shape: [num_envs, num_amp_steps, num_amp_features]
+                    self._amp_obs_buf[bad_ids] = 0.0
         # -----------------------------------------------
+
+        self._compute_observations()
+        self._compute_reward(self.actions)
+        self._compute_reset()
         
         self.extras["terminate"] = self._terminate_buf
 
