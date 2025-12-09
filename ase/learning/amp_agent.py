@@ -266,6 +266,18 @@ class AMPAgent(common_agent.CommonAgent):
     def calc_gradients(self, input_dict):
         self.set_train()
 
+        # ---- debug: detect non-finite physics state ----
+        # sanity checks
+        for k in ['obs', 'amp_obs', 'amp_obs_replay', 'amp_obs_demo', 
+                  'advantages', 'returns', 'actions']:
+            if k in input_dict:
+                t = input_dict[k]
+                if not torch.isfinite(t).all():
+                    print(f"[DEBUG] non-finite in batch field '{k}'")
+                    # you can either raise here to debug, or clean:
+                    input_dict[k] = torch.nan_to_num(t, nan=0.0, posinf=0.0, neginf=0.0)
+        # ---- debug: detect non-finite physics state ----
+
         value_preds_batch = input_dict['old_values']
         old_action_log_probs_batch = input_dict['old_logp_actions']
         advantage = input_dict['advantages']
@@ -533,6 +545,11 @@ class AMPAgent(common_agent.CommonAgent):
         return
 
     def _preproc_amp_obs(self, amp_obs):
+        # ---- debug: detect non-finite physics state ----
+        # clean any stragglers just in case
+        amp_obs = torch.nan_to_num(amp_obs, nan=0.0, posinf=0.0, neginf=0.0)
+        # ---- debug: detect non-finite physics state ----
+
         if self._normalize_amp_input:
             amp_obs = self._amp_input_mean_std(amp_obs)
         return amp_obs
@@ -577,6 +594,15 @@ class AMPAgent(common_agent.CommonAgent):
         return disc_r
 
     def _store_replay_amp_obs(self, amp_obs):
+        # ---- debug: detect non-finite physics state ----
+        # drop any non-finite amp_obs rows
+        finite_mask = torch.isfinite(amp_obs).all(dim=1)
+        if not finite_mask.all():
+            print("[DEBUG] dropping non-finite amp_obs from replay:",
+                  (~finite_mask).nonzero(as_tuple=False).flatten().tolist())
+            amp_obs = amp_obs[finite_mask]
+        # ---- debug: detect non-finite physics state ----
+
         buf_size = self._amp_replay_buffer.get_buffer_size()
         buf_total_count = self._amp_replay_buffer.get_total_count()
         if (buf_total_count > buf_size):

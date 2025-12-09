@@ -659,12 +659,6 @@ class Humanoid(BaseTask):
                 # 3) if AMP history exists, wipe it for those envs
                 if hasattr(self, "_amp_obs_buf"):
                     self._amp_obs_buf[bad_ids] = 0.0
-
-                # 2) if this is actually HumanoidAMP, also wipe AMP history
-                #    so no NaNs remain in amp_obs_buf
-                if hasattr(self, "_amp_obs_buf"):
-                    # _amp_obs_buf shape: [num_envs, num_amp_steps, num_amp_features]
-                    self._amp_obs_buf[bad_ids] = 0.0
         # -----------------------------------------------
 
         self._compute_observations()
