@@ -423,6 +423,9 @@ class Humanoid(BaseTask):
             beta_dim = self._template_betas.shape[1]
             # torch.Size([2, 10]) [number_actors, betas]
             self._betas_env = torch.zeros(self.num_envs, beta_dim, device=self.device)
+            # ---- debug: detect non-finite physics state ----
+            self._template_ids_env = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            # ---- debug: detect non-finite physics state ----
         # load beta into observation ===============
         
         for i in range(self.num_envs):
@@ -438,6 +441,9 @@ class Humanoid(BaseTask):
             if asset_type == "smpl":
                 template_id = i % m
                 self._betas_env[i] = self._template_betas[template_id]
+                # ---- debug: detect non-finite physics state ----
+                self._template_ids_env[i] = template_id
+                # ---- debug: detect non-finite physics state ----
             # load beta into observation ===============
 
             self._build_env(i, env_ptr, h_asset)
@@ -624,16 +630,29 @@ class Humanoid(BaseTask):
 
         self._refresh_sim_tensors()
 
-        # ---- debug: check rigid body state ----
-        if not torch.isfinite(self._rigid_body_pos).all():
-            raise RuntimeError("Non-finite rigid body pos")
-        if not torch.isfinite(self._rigid_body_rot).all():
-            raise RuntimeError("Non-finite rigid body rot")
-        if not torch.isfinite(self._rigid_body_vel).all():
-            raise RuntimeError("Non-finite rigid body vel")
-        if not torch.isfinite(self._rigid_body_ang_vel).all():
-            raise RuntimeError("Non-finite rigid body ang vel")
-        # ---------------------------------------
+        # ---- debug: detect non-finite physics state ----
+        if self.cfg["env"]["asset"]["assetType"] == "smpl":
+            bad_pos  = ~torch.isfinite(self._rigid_body_pos).all(dim=(1, 2))
+            bad_rot  = ~torch.isfinite(self._rigid_body_rot).all(dim=(1, 2))
+            bad_vel  = ~torch.isfinite(self._rigid_body_vel).all(dim=(1, 2))
+            bad_ang  = ~torch.isfinite(self._rigid_body_ang_vel).all(dim=(1, 2))
+            bad_envs = bad_pos | bad_rot | bad_vel | bad_ang
+
+            if bad_envs.any():
+                bad_ids = bad_envs.nonzero(as_tuple=False).flatten()
+                print("[DEBUG] non-finite physics in envs:", bad_ids.tolist())
+
+                # if you stored template ids, report them:
+                if hasattr(self, "_template_ids_env"):
+                    tmpl_ids = self._template_ids_env[bad_ids].tolist()
+                    print("[DEBUG] template indices:", tmpl_ids)
+                    asset_files = self.cfg["env"]["asset"]["assetFileName"]
+                    for e, t in zip(bad_ids.tolist(), tmpl_ids):
+                        print(f"[DEBUG] env {e} uses asset {asset_files[t]}")
+
+                # simplest short-term behaviour: reset those envs
+                self.reset(env_ids=bad_ids)
+        # -----------------------------------------------
 
         self._compute_observations()
         self._compute_reward(self.actions)
