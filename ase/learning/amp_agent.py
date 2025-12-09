@@ -68,6 +68,14 @@ class AMPAgent(common_agent.CommonAgent):
         for n in range(self.horizon_length):
 
             self.obs = self.env_reset(done_indices)
+
+            # ---- debug: detect non-finite physics state ----
+            if not torch.isfinite(self.obs['obs']).all():
+                bad_envs = ~torch.isfinite(self.obs).all(dim=1)
+                bad_ids = bad_envs.nonzero(as_tuple=False).flatten()
+                print("[DEBUG] non-finite amp_agent.obs:", bad_ids.tolist())
+            # ---- debug: detect non-finite physics state ----
+
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
             if self.use_action_masks:
