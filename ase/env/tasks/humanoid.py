@@ -623,6 +623,18 @@ class Humanoid(BaseTask):
         self.progress_buf += 1
 
         self._refresh_sim_tensors()
+
+        # ---- debug: check rigid body state ----
+        if not torch.isfinite(self._rigid_body_pos).all():
+            raise RuntimeError("Non-finite rigid body pos")
+        if not torch.isfinite(self._rigid_body_rot).all():
+            raise RuntimeError("Non-finite rigid body rot")
+        if not torch.isfinite(self._rigid_body_vel).all():
+            raise RuntimeError("Non-finite rigid body vel")
+        if not torch.isfinite(self._rigid_body_ang_vel).all():
+            raise RuntimeError("Non-finite rigid body ang vel")
+        # ---------------------------------------
+
         self._compute_observations()
         self._compute_reward(self.actions)
         self._compute_reset()
