@@ -569,10 +569,9 @@ class Humanoid(BaseTask):
                 betas = self._betas_env                        # [num_envs, B]
             else:
                 betas = self._betas_env[env_ids]               # [len(env_ids), B]
-            
-            # sanity check: no NaN/inf in obs
-            if not torch.isfinite(betas).all():
-                raise RuntimeError("Non-finite values in obs (check betas and obs size)!!!!!!!!!!!")
+
+            # optional: simple normalisation to keep magnitudes modest
+            betas = betas / 3.0
 
             obs = torch.cat([obs, betas], dim=-1)
             # torch.Size([num_envs, 358]) -> torch.Size([num_envs, 368]), 10 betas
