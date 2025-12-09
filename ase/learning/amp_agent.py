@@ -70,10 +70,18 @@ class AMPAgent(common_agent.CommonAgent):
             self.obs = self.env_reset(done_indices)
 
             # ---- debug: detect non-finite physics state ----
-            if not torch.isfinite(self.obs['obs']).all():
-                bad_envs = ~torch.isfinite(self.obs['obs']).all(dim=1)
+            # guard obs returned by env_reset
+            obs_tensor = self.obs['obs']
+            if not torch.isfinite(obs_tensor).all():
+                bad_envs = ~torch.isfinite(obs_tensor).all(dim=1)
                 bad_ids = bad_envs.nonzero(as_tuple=False).flatten()
-                print("[DEBUG] non-finite amp_agent.obs:", bad_ids.tolist())
+                print("[DEBUG] non-finite obs after env_reset in play_steps:", bad_ids.tolist())
+
+                # force a hard reset of just those envs at the python wrapper level
+                self.vec_env.reset(bad_ids)
+                self.obs = self.env_reset(bad_ids)  # recompute obs for them
+                obs_tensor = self.obs['obs']
+                assert torch.isfinite(obs_tensor).all(), "obs still non-finite after forced reset"
             # ---- debug: detect non-finite physics state ----
 
             self.experience_buffer.update_data('obses', n, self.obs['obs'])

@@ -650,14 +650,16 @@ class Humanoid(BaseTask):
                     for e, t in zip(bad_ids.tolist(), tmpl_ids):
                         print(f"[DEBUG] env {e} uses asset {asset_files[t]}")
 
+                self.reset_buf[bad_ids] = 1
+
                 # 1) reset physics state
                 self.reset(env_ids=bad_ids)
 
                 # 2) re-sync sim tensors after reset
                 self._refresh_sim_tensors()
 
-                # 3) rebuild observations for the reset envs
-                self._compute_observations(env_ids=bad_ids)
+                # # 3) rebuild observations for the reset envs
+                # self._compute_observations(env_ids=bad_ids)
 
                 # 3) if AMP history exists, wipe it for those envs
                 if hasattr(self, "_amp_obs_buf"):
