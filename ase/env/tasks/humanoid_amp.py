@@ -121,63 +121,52 @@ class HumanoidAMP(Humanoid):
     def _setup_character_props(self, key_bodies):
         super()._setup_character_props(key_bodies)
         # multi humanoid template change ===============
-        asset_type = self.cfg["env"]["asset"]["assetType"]
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
         num_key_bodies = len(key_bodies)
 
-        if (asset_file == "mjcf/amp_humanoid.xml"):
-            self._num_amp_obs_per_step = 13 + self._dof_obs_size + 28 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
-        elif (asset_file == "mjcf/amp_humanoid_sword_shield.xml"):
-            self._num_amp_obs_per_step = 13 + self._dof_obs_size + 31 + 3 * num_key_bodies # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
-        elif asset_type == "smpl":
-            # asset_file.startswith("mjcf/smpl_"), it's a list of asset files
-            # some conditions borrowed from PHC
-            # Use AMP observation version 1 (basic key-body positions only)
-            self.amp_obs_v = 1
-            # Include root height in AMP observations
-            self._amp_root_height_obs = True
-            # Use a subset of degrees of freedom instead of all joints
-            self._has_dof_subset = False
-            # Do not include discrete shape parameters
-            self._has_shape_obs_disc = False
-            # Do not include discrete limb length/weight features
-            self._has_limb_weight_obs_disc = False
+        # asset_file.startswith("mjcf/smpl_"), it's a list of asset files
+        # some conditions borrowed from PHC
+        # Use AMP observation version 1 (basic key-body positions only)
+        self.amp_obs_v = 1
+        # Include root height in AMP observations
+        self._amp_root_height_obs = True
+        # Use a subset of degrees of freedom instead of all joints
+        self._has_dof_subset = False
+        # Do not include discrete shape parameters
+        self._has_shape_obs_disc = False
+        # Do not include discrete limb length/weight features
+        self._has_limb_weight_obs_disc = False
 
-            remove_names = ["L_Hand", "R_Hand", "L_Toe", "R_Toe"]
-            disc_idxes = []
+        remove_names = ["L_Hand", "R_Hand", "L_Toe", "R_Toe"]
+        disc_idxes = []
 
-            for idx, name in enumerate(self._dof_names):
-                if not name in remove_names:
-                    disc_idxes.append(np.arange(idx * 3, (idx + 1) * 3))
-            
-            if len(disc_idxes) > 0:
-                self.dof_subset = torch.from_numpy(np.concatenate(disc_idxes)) 
-            else: 
-                torch.tensor([]).long()
+        for idx, name in enumerate(self._dof_names):
+            if not name in remove_names:
+                disc_idxes.append(np.arange(idx * 3, (idx + 1) * 3))
+        
+        if len(disc_idxes) > 0:
+            self.dof_subset = torch.from_numpy(np.concatenate(disc_idxes)) 
+        else: 
+            torch.tensor([]).long()
 
-            if self.amp_obs_v == 1:
-                self._num_amp_obs_per_step = 13 + self._dof_obs_size + len(self._dof_names) * 3 + 3 * num_key_bodies  # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
-            else:
-                self._num_amp_obs_per_step = 13 + self._dof_obs_size + len(self._dof_names) * 3 + 6 * num_key_bodies  # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, key_body_vel]
-
-            if not self._amp_root_height_obs:
-                self._num_amp_obs_per_step -= 1
-
-            if self._has_dof_subset:
-                self._num_amp_obs_per_step -= (6 + 3) * int((len(self._dof_names) * 3 - len(self.dof_subset)) / 3)
-
-            if self._has_shape_obs_disc:
-                self._num_amp_obs_per_step += 11
-            
-            if self._has_limb_weight_obs_disc:
-                self._num_amp_obs_per_step += 10
-
-            # 196
-            # print(self._num_amp_obs_per_step)
-
+        if self.amp_obs_v == 1:
+            self._num_amp_obs_per_step = 13 + self._dof_obs_size + len(self._dof_names) * 3 + 3 * num_key_bodies  # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
         else:
-            print("Unsupported character config file: {s}".format(asset_file))
-            assert(False)
+            self._num_amp_obs_per_step = 13 + self._dof_obs_size + len(self._dof_names) * 3 + 6 * num_key_bodies  # [root_h, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, key_body_vel]
+
+        if not self._amp_root_height_obs:
+            self._num_amp_obs_per_step -= 1
+
+        if self._has_dof_subset:
+            self._num_amp_obs_per_step -= (6 + 3) * int((len(self._dof_names) * 3 - len(self.dof_subset)) / 3)
+
+        if self._has_shape_obs_disc:
+            self._num_amp_obs_per_step += 11
+        
+        if self._has_limb_weight_obs_disc:
+            self._num_amp_obs_per_step += 10
+
+        # 196
+        # print(self._num_amp_obs_per_step)
 
         return
 
@@ -185,46 +174,39 @@ class HumanoidAMP(Humanoid):
         assert(self._dof_offsets[-1] == self.num_dof)
 
         # multi humanoid template change ===============
-        asset_type = self.cfg["env"]["asset"]["assetType"]
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
-        if asset_type == "smpl":
-            # multi humanoid template change ===============
-            asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
-            sk_tree = SkeletonTree.from_mjcf(asset_file_full)
+        # multi humanoid template change ===============
+        asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
+        sk_tree = SkeletonTree.from_mjcf(asset_file_full)
 
-            gender_beta = np.zeros(17)
-            num_envs = self.cfg["env"]["numEnvs"]
+        gender_beta = np.zeros(17)
+        num_envs = self.cfg["env"]["numEnvs"]
 
-            humanoid_shapes = torch.tensor(np.array([gender_beta] * num_envs)).float().to(self.device)
+        humanoid_shapes = torch.tensor(np.array([gender_beta] * num_envs)).float().to(self.device)
 
-            motion_lib_cfg = EasyDict({
-                "motion_file": motion_file,
-                "device": torch.device("cpu"),
-                "fix_height": 1,
-                "min_length": -1,
-                "max_length": -1,
-                "im_eval": True,
-                "multi_thread": False,
-                "smpl_type": "smpl",
-                "randomrize_heading": True,
-                "device": self.device,
-                "min_length": -1, 
-                "step_dt": 1/60,
-                "key_body_ids": self._key_body_ids
-            })
+        motion_lib_cfg = EasyDict({
+            "motion_file": motion_file,
+            "device": torch.device("cpu"),
+            "fix_height": 1,
+            "min_length": -1,
+            "max_length": -1,
+            "im_eval": True,
+            "multi_thread": False,
+            "smpl_type": "smpl",
+            "randomrize_heading": True,
+            "device": self.device,
+            "min_length": -1, 
+            "step_dt": 1/60,
+            "key_body_ids": self._key_body_ids
+        })
 
-            self._motion_lib = MotionLibSMPL(motion_lib_cfg=motion_lib_cfg)
+        self._motion_lib = MotionLibSMPL(motion_lib_cfg=motion_lib_cfg)
 
-            self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
-                        gender_betas=humanoid_shapes.cpu(), 
-                        random_sample=True)
-        else:
-            self._motion_lib = MotionLib(motion_file=motion_file,
-                                     dof_body_ids=self._dof_body_ids,
-                                     dof_offsets=self._dof_offsets,
-                                     key_body_ids=self._key_body_ids.cpu().numpy(), 
-                                     device=self.device)
+        self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
+                    gender_betas=humanoid_shapes.cpu(), 
+                    random_sample=True)
+
         return
     
     def _reset_envs(self, env_ids):

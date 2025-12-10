@@ -58,15 +58,9 @@ class Humanoid(BaseTask):
         contact_force_tensor = self.gym.acquire_net_contact_force_tensor(self.sim)
 
         # multi humanoid template change ===============
-        asset_type = self.cfg["env"]["asset"]["assetType"]
-
-        if asset_type == "smpl":
-            self.force_sensor_joints = cfg["env"].get("force_sensor_joints", ["L_Ankle", "R_Ankle"]) # force tensor joints
-            sensors_per_env = len(self.force_sensor_joints)
-            self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
-        else:
-            sensors_per_env = 2
-            self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
+        self.force_sensor_joints = cfg["env"].get("force_sensor_joints", ["L_Ankle", "R_Ankle"]) # force tensor joints
+        sensors_per_env = len(self.force_sensor_joints)
+        self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(self.num_envs, sensors_per_env * 6)
 
         dof_force_tensor = self.gym.acquire_dof_force_tensor(self.sim)
         self.dof_force_tensor = gymtorch.wrap_tensor(dof_force_tensor).view(self.num_envs, self.num_dof)
@@ -197,69 +191,35 @@ class Humanoid(BaseTask):
 
     def _setup_character_props(self, key_bodies):
         # multi humanoid template change ===============
-        asset_type = self.cfg["env"]["asset"]["assetType"]
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+        self._body_names = SMPL_MUJOCO_NAMES
+        self._dof_names = self._body_names[1:]
 
-        if (asset_file == "mjcf/amp_humanoid.xml"):
-            self._dof_body_ids = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14]
-            self._dof_offsets = [0, 3, 6, 9, 10, 13, 14, 17, 18, 21, 24, 25, 28]
-            self._dof_obs_size = 72
-            self._num_actions = 28
-            self._num_obs = 1 + 15 * (3 + 6 + 3 + 3) - 3
-            
-        elif (asset_file == "mjcf/amp_humanoid_sword_shield.xml"):
-            self._dof_body_ids = [1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 14, 15, 16]
-            self._dof_offsets = [0, 3, 6, 9, 10, 13, 16, 17, 20, 21, 24, 27, 28, 31]
-            self._dof_obs_size = 78
-            self._num_actions = 31
-            self._num_obs = 1 + 17 * (3 + 6 + 3 + 3) - 3
+        # ankle joints are the lowest articulated joints
+        # self.force_sensor_joints = ["L_Ankle", "R_Ankle"]
+        self._dof_body_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+        self._dof_offsets = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69]
 
-        elif asset_type == "smpl":
+        self._dof_obs_size = len(self._dof_names) * 6
+        self._dof_size = len(self._dof_names) * 3
 
-            self._body_names = SMPL_MUJOCO_NAMES
-            self._dof_names = self._body_names[1:]
-            self.humanoid_type = "smpl"
-            # ankle joints are the lowest articulated joints
-            # self.force_sensor_joints = ["L_Ankle", "R_Ankle"]
+        self._num_actions = len(self._dof_names) * 3
 
-            self._dof_body_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
-            self._dof_offsets = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69]
+        # some conditions for `self._num_obs`, burrowed from PHC
+        self._root_height_obs = True
+        self.self_obs_v = 1
 
-            self._dof_obs_size = len(self._dof_names) * 6
-            self._dof_size = len(self._dof_names) * 3
+        # height + num_bodies * 15 (pos + vel + rot + ang_vel) - root_pos
+        self._num_obs = 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3
 
-            self._num_actions = len(self._dof_names) * 3
+        self._num_obs += 10
 
-            # some conditions for `self._num_obs`, burrowed from PHC
-            self._has_limb_weight_obs = False
-            self._root_height_obs = True
-            self.self_obs_v = 1
+        # load beta into observation ===============
 
-            # height + num_bodies * 15 (pos + vel + rot + ang_vel) - root_pos
-            self._num_obs = 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3
-
-            # load beta into observation ===============
-            if self.humanoid_type in ["smpl"]:
-                self._num_obs += 10
-                # 368
-            elif self.humanoid_type in ["smplh", "smplx"]:
-                self._num_obs += 16
-            # load beta into observation ===============
-
-            # if self._has_limb_weight_obs: self._num_obs += 23 + 24 
-            # if not self._masterfoot else  29 + 30 # 23 + 24 (length + weight)
-            if self._has_limb_weight_obs:
-                self._num_obs += 10
-
-            if not self._root_height_obs:
-                self._num_obs -= 1
-            
-            if self.self_obs_v == 3:
-                self._num_obs += 6 * len(self.force_sensor_joints)
-
-        else:
-            print("Unsupported character config file: {s}".format(asset_file))
-            assert(False)
+        if not self._root_height_obs:
+            self._num_obs -= 1
+        
+        if self.self_obs_v == 3:
+            self._num_obs += 6 * len(self.force_sensor_joints)
 
         return
 
@@ -286,7 +246,6 @@ class Humanoid(BaseTask):
         upper = gymapi.Vec3(spacing, spacing, spacing)
 
         asset_root = self.cfg["env"]["asset"]["assetRoot"]
-        asset_type = self.cfg["env"]["asset"]["assetType"]
         asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
         asset_options = gymapi.AssetOptions()
@@ -298,118 +257,83 @@ class Humanoid(BaseTask):
         motor_efforts = None
 
         humanoid_assets = []
+        # load beta into observation ===============
+        template_betas = []   # <--- add this
+        # load beta into observation ===============
 
-        if asset_type == "smpl":
+        for i, af in enumerate(asset_file):
+
+            humanoid_asset = self.gym.load_asset(self.sim, asset_root, af, asset_options)
+
             # load beta into observation ===============
-            template_betas = []   # <--- add this
+            # load betas for this template
+            beta_rel_dir = os.path.dirname(af)                       # e.g. "mjcf/smpl"
+            smpl_stem = os.path.splitext(os.path.basename(af))[0]    # "a0f02530_smpl"
+            beta_prefix = smpl_stem.rsplit("_", 1)[0]                 # "a0f02530"
+            beta_filename = beta_prefix + "_betas.pt"                 # "a0f02530_betas.pt"
+            beta_path = os.path.join(asset_root, beta_rel_dir, beta_filename)
+
+            betas = torch.load(beta_path, weights_only=True)
+            # here the betas should be torch.Size([1, 10])
+            if len(betas.shape) > 1:
+                betas = betas[0]
+
+            betas = torch.as_tensor(betas, dtype=torch.float32, device=self.device)
+            template_betas.append(betas)
             # load beta into observation ===============
-
-            for i, af in enumerate(asset_file):
-
-                humanoid_asset = self.gym.load_asset(self.sim, asset_root, af, asset_options)
-
-                # load beta into observation ===============
-                # load betas for this template
-                beta_rel_dir = os.path.dirname(af)                       # e.g. "mjcf/smpl"
-                smpl_stem = os.path.splitext(os.path.basename(af))[0]    # "a0f02530_smpl"
-                beta_prefix = smpl_stem.rsplit("_", 1)[0]                 # "a0f02530"
-                beta_filename = beta_prefix + "_betas.pt"                 # "a0f02530_betas.pt"
-                beta_path = os.path.join(asset_root, beta_rel_dir, beta_filename)
-
-                betas = torch.load(beta_path, weights_only=True)
-                # here the betas should be torch.Size([1, 10])
-                if len(betas.shape) > 1:
-                    betas = betas[0]
-
-                betas = torch.as_tensor(betas, dtype=torch.float32, device=self.device)
-                template_betas.append(betas)
-                # load beta into observation ===============
-
-                actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
-                curr_motor_efforts = [prop.motor_effort for prop in actuator_props]
-
-                right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
-                left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
-
-                sensor_pose = gymapi.Transform()
-
-                self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
-                self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
-
-                # sensor_count = self.gym.get_asset_force_sensor_count(humanoid_asset)
-                # if sensors_per_env is None:
-                #     sensors_per_env = sensor_count
-                # elif sensor_count != sensors_per_env:
-                #     raise ValueError("All humanoid assets must expose the same number of force sensors")
-
-                curr_num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
-                curr_num_dof = self.gym.get_asset_dof_count(humanoid_asset)
-                curr_num_joints = self.gym.get_asset_joint_count(humanoid_asset)
-
-                if i == 0:
-                    # the smpl type are of same rigid body and joints, so only take info from the first one
-
-                    motor_efforts = curr_motor_efforts
-
-                    self.max_motor_effort = max(motor_efforts)
-                    self.motor_efforts = to_torch(motor_efforts, device=self.device)
-   
-                    self.torso_index = 0
-                    self.num_bodies = curr_num_bodies
-                    self.num_dof = curr_num_dof
-                    self.num_joints = curr_num_joints
-
-                else:
-
-                    assert curr_num_bodies == self.num_bodies, f"diff num_bodies: {curr_num_bodies}, {self.num_bodies}, {af}, {i}"
-                    assert curr_num_dof == self.num_dof, f"diff num_bodies: {curr_num_dof}, {self.num_dof}"
-                    assert curr_num_joints == self.num_joints, f"diff num_bodies: {curr_num_joints}, {self.num_joints}"
-
-                    if len(curr_motor_efforts) != len(motor_efforts):
-                        raise ValueError("All humanoid assets must expose the same number of actuators")
-                    if not np.allclose(curr_motor_efforts, motor_efforts):
-                        raise ValueError("All humanoid assets must share identical actuator effort limits")
-
-                humanoid_assets.append(humanoid_asset)
-            
-            # load beta into observation ===============
-            # torch.Size([64, 10])
-            self._template_betas = torch.stack(template_betas, dim=0)    # [T, B]
-            # load beta into observation ===============
-        else:
-
-            asset_path = os.path.join(asset_root, asset_file)
-            asset_root = os.path.dirname(asset_path)
-            asset_file = os.path.basename(asset_path)
-        
-            humanoid_assets = [self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)]
-
-            # the assets of the same rigid body and joints.
-            # so fer getting these information, we just use the first one
-            humanoid_asset = humanoid_assets[0]
 
             actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
-            motor_efforts = [prop.motor_effort for prop in actuator_props]
+            curr_motor_efforts = [prop.motor_effort for prop in actuator_props]
 
-            # create force sensors at the feet
-            # if asset_file.startswith("mjcf/smpl_"):
-            right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "right_foot")
-            left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "left_foot")
+            right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
+            left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
 
             sensor_pose = gymapi.Transform()
 
             self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
             self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
 
-            #asset_options.fix_base_link = True
+            # sensor_count = self.gym.get_asset_force_sensor_count(humanoid_asset)
+            # if sensors_per_env is None:
+            #     sensors_per_env = sensor_count
+            # elif sensor_count != sensors_per_env:
+            #     raise ValueError("All humanoid assets must expose the same number of force sensors")
 
-            self.max_motor_effort = max(motor_efforts)
-            self.motor_efforts = to_torch(motor_efforts, device=self.device)
+            curr_num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
+            curr_num_dof = self.gym.get_asset_dof_count(humanoid_asset)
+            curr_num_joints = self.gym.get_asset_joint_count(humanoid_asset)
 
-            self.torso_index = 0
-            self.num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
-            self.num_dof = self.gym.get_asset_dof_count(humanoid_asset)
-            self.num_joints = self.gym.get_asset_joint_count(humanoid_asset)
+            if i == 0:
+                # the smpl type are of same rigid body and joints, so only take info from the first one
+
+                motor_efforts = curr_motor_efforts
+
+                self.max_motor_effort = max(motor_efforts)
+                self.motor_efforts = to_torch(motor_efforts, device=self.device)
+
+                self.torso_index = 0
+                self.num_bodies = curr_num_bodies
+                self.num_dof = curr_num_dof
+                self.num_joints = curr_num_joints
+
+            else:
+
+                assert curr_num_bodies == self.num_bodies, f"diff num_bodies: {curr_num_bodies}, {self.num_bodies}, {af}, {i}"
+                assert curr_num_dof == self.num_dof, f"diff num_bodies: {curr_num_dof}, {self.num_dof}"
+                assert curr_num_joints == self.num_joints, f"diff num_bodies: {curr_num_joints}, {self.num_joints}"
+
+                if len(curr_motor_efforts) != len(motor_efforts):
+                    raise ValueError("All humanoid assets must expose the same number of actuators")
+                if not np.allclose(curr_motor_efforts, motor_efforts):
+                    raise ValueError("All humanoid assets must share identical actuator effort limits")
+
+            humanoid_assets.append(humanoid_asset)
+        
+        # load beta into observation ===============
+        # torch.Size([64, 10])
+        self._template_betas = torch.stack(template_betas, dim=0)    # [T, B]
+        # load beta into observation ===============
+    
         # multi humanoid template change ===============
 
         self.humanoid_handles = []
@@ -419,13 +343,12 @@ class Humanoid(BaseTask):
 
         # load beta into observation ===============
         # allocate per-env betas for smpl
-        if asset_type == "smpl":
-            beta_dim = self._template_betas.shape[1]
-            # torch.Size([2, 10]) [number_actors, betas]
-            self._betas_env = torch.zeros(self.num_envs, beta_dim, device=self.device)
-            # ---- debug: detect non-finite physics state ----
-            self._template_ids_env = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
-            # ---- debug: detect non-finite physics state ----
+        beta_dim = self._template_betas.shape[1]
+        # torch.Size([2, 10]) [number_actors, betas]
+        self._betas_env = torch.zeros(self.num_envs, beta_dim, device=self.device)
+        # ---- debug: detect non-finite physics state ----
+        self._template_ids_env = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        # ---- debug: detect non-finite physics state ----
         # load beta into observation ===============
         
         for i in range(self.num_envs):
@@ -438,12 +361,11 @@ class Humanoid(BaseTask):
 
             # load beta into observation ===============
             # assign beta for this env when smpl is used
-            if asset_type == "smpl":
-                template_id = i % m
-                self._betas_env[i] = self._template_betas[template_id]
-                # ---- debug: detect non-finite physics state ----
-                self._template_ids_env[i] = template_id
-                # ---- debug: detect non-finite physics state ----
+            template_id = i % m
+            self._betas_env[i] = self._template_betas[template_id]
+            # ---- debug: detect non-finite physics state ----
+            self._template_ids_env[i] = template_id
+            # ---- debug: detect non-finite physics state ----
             # load beta into observation ===============
 
             self._build_env(i, env_ptr, h_asset)
@@ -570,17 +492,16 @@ class Humanoid(BaseTask):
 
         # load beta into observation ===============
         # append shape betas for smpl assets
-        if self.cfg["env"]["asset"]["assetType"] == "smpl":
-            if env_ids is None:
-                betas = self._betas_env                        # [num_envs, B]
-            else:
-                betas = self._betas_env[env_ids]               # [len(env_ids), B]
+        if env_ids is None:
+            betas = self._betas_env                        # [num_envs, B]
+        else:
+            betas = self._betas_env[env_ids]               # [len(env_ids), B]
 
-            # optional: simple normalisation to keep magnitudes modest
-            betas = betas / 3.0
+        # optional: simple normalisation to keep magnitudes modest
+        betas = betas / 3.0
 
-            obs = torch.cat([obs, betas], dim=-1)
-            # torch.Size([num_envs, 358]) -> torch.Size([num_envs, 368]), 10 betas
+        obs = torch.cat([obs, betas], dim=-1)
+        # torch.Size([num_envs, 358]) -> torch.Size([num_envs, 368]), 10 betas
         # load beta into observation ===============
 
         if (env_ids is None):
@@ -631,39 +552,38 @@ class Humanoid(BaseTask):
         self._refresh_sim_tensors()
 
         # ---- debug: detect non-finite physics state ----
-        if self.cfg["env"]["asset"]["assetType"] == "smpl":
-            bad_pos  = ~torch.isfinite(self._rigid_body_pos).all(dim=(1, 2))
-            bad_rot  = ~torch.isfinite(self._rigid_body_rot).all(dim=(1, 2))
-            bad_vel  = ~torch.isfinite(self._rigid_body_vel).all(dim=(1, 2))
-            bad_ang  = ~torch.isfinite(self._rigid_body_ang_vel).all(dim=(1, 2))
-            bad_envs = bad_pos | bad_rot | bad_vel | bad_ang
+        bad_pos  = ~torch.isfinite(self._rigid_body_pos).all(dim=(1, 2))
+        bad_rot  = ~torch.isfinite(self._rigid_body_rot).all(dim=(1, 2))
+        bad_vel  = ~torch.isfinite(self._rigid_body_vel).all(dim=(1, 2))
+        bad_ang  = ~torch.isfinite(self._rigid_body_ang_vel).all(dim=(1, 2))
+        bad_envs = bad_pos | bad_rot | bad_vel | bad_ang
 
-            if bad_envs.any():
-                bad_ids = bad_envs.nonzero(as_tuple=False).flatten()
-                print("[DEBUG] non-finite physics in envs:", bad_ids.tolist())
+        if bad_envs.any():
+            bad_ids = bad_envs.nonzero(as_tuple=False).flatten()
+            print("[DEBUG] non-finite physics in envs:", bad_ids.tolist())
 
-                # if you stored template ids, report them:
-                if hasattr(self, "_template_ids_env"):
-                    tmpl_ids = self._template_ids_env[bad_ids].tolist()
-                    print("[DEBUG] template indices:", tmpl_ids)
-                    asset_files = self.cfg["env"]["asset"]["assetFileName"]
-                    for e, t in zip(bad_ids.tolist(), tmpl_ids):
-                        print(f"[DEBUG] env {e} uses asset {asset_files[t]}")
+            # if you stored template ids, report them:
+            if hasattr(self, "_template_ids_env"):
+                tmpl_ids = self._template_ids_env[bad_ids].tolist()
+                print("[DEBUG] template indices:", tmpl_ids)
+                asset_files = self.cfg["env"]["asset"]["assetFileName"]
+                for e, t in zip(bad_ids.tolist(), tmpl_ids):
+                    print(f"[DEBUG] env {e} uses asset {asset_files[t]}")
 
-                self.reset_buf[bad_ids] = 1
+            self.reset_buf[bad_ids] = 1
 
-                # 1) reset physics state
-                self.reset(env_ids=bad_ids)
+            # 1) reset physics state
+            self.reset(env_ids=bad_ids)
 
-                # 2) re-sync sim tensors after reset
-                self._refresh_sim_tensors()
+            # 2) re-sync sim tensors after reset
+            self._refresh_sim_tensors()
 
-                # # 3) rebuild observations for the reset envs
-                # self._compute_observations(env_ids=bad_ids)
+            # # 3) rebuild observations for the reset envs
+            # self._compute_observations(env_ids=bad_ids)
 
-                # 3) if AMP history exists, wipe it for those envs
-                if hasattr(self, "_amp_obs_buf"):
-                    self._amp_obs_buf[bad_ids] = 0.0
+            # 3) if AMP history exists, wipe it for those envs
+            if hasattr(self, "_amp_obs_buf"):
+                self._amp_obs_buf[bad_ids] = 0.0
         # -----------------------------------------------
 
         self._compute_observations()
@@ -718,13 +638,6 @@ class Humanoid(BaseTask):
     def _init_camera(self):
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self._cam_prev_char_pos = self._humanoid_root_states[0, 0:3].cpu().numpy()
-        
-        # cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], 
-        #                       self._cam_prev_char_pos[1] - 3.0, 
-        #                       1.0)
-        # cam_target = gymapi.Vec3(self._cam_prev_char_pos[0],
-        #                          self._cam_prev_char_pos[1],
-        #                          1.0)
         
         cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0] - 1.0, 
                               self._cam_prev_char_pos[1] - 3.0, 

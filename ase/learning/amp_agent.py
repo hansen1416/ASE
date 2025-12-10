@@ -70,6 +70,7 @@ class AMPAgent(common_agent.CommonAgent):
             self.obs = self.env_reset(done_indices)
 
             # ---- debug: detect non-finite physics state ----
+            # we should not have this!!!!
             # guard obs returned by env_reset
             obs_tensor = self.obs['obs']
             if not torch.isfinite(obs_tensor).all():
