@@ -1,3 +1,4 @@
 - reverse 1211 actions
 - try with safe humanoid
 - find out why the 12 humanoids are faulty
+- how to config PPO, bound_loss_type: "regularisation"? How to condition on the body shapes? So we can learn properly.
