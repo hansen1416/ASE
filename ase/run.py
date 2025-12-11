@@ -182,7 +182,7 @@ def main():
 
     if USER == "hlz":
 
-        num_actors = 4
+        num_actors = 8
 
         cfg['env']['numEnvs'] = num_actors
         cfg['env']['stateInit'] = 'Default'
