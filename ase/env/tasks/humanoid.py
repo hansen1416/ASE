@@ -16,6 +16,14 @@ SMPLH_MUJOCO_NAMES = ['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 
                       'L_Wrist', 'L_Index1', 'L_Index2', 'L_Index3', 'L_Middle1', 'L_Middle2', 'L_Middle3', 'L_Pinky1', 'L_Pinky2', 'L_Pinky3', 'L_Ring1', 'L_Ring2', 'L_Ring3', 'L_Thumb1', 'L_Thumb2', 'L_Thumb3', 
                       'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Index1', 'R_Index2', 'R_Index3', 'R_Middle1', 'R_Middle2', 'R_Middle3', 'R_Pinky1', 'R_Pinky2', 'R_Pinky3', 'R_Ring1', 'R_Ring2', 'R_Ring3', 'R_Thumb1', 'R_Thumb2', 'R_Thumb3']
 
+def mat33_to_np(m):
+    # m: gymapi.Mat33
+    return np.array([
+        [m.x.x, m.x.y, m.x.z],
+        [m.y.x, m.y.y, m.y.z],
+        [m.z.x, m.z.y, m.z.z],
+    ], dtype=np.float32)
+
 
 class Humanoid(BaseTask):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
@@ -424,17 +432,39 @@ class Humanoid(BaseTask):
             # multi humanoid template change ===============
             self.envs.append(env_ptr)
 
-        dof_prop = self.gym.get_actor_dof_properties(self.envs[0], self.humanoid_handles[0])
-        for j in range(self.num_dof):
-            if dof_prop['lower'][j] > dof_prop['upper'][j]:
-                self.dof_limits_lower.append(dof_prop['upper'][j])
-                self.dof_limits_upper.append(dof_prop['lower'][j])
-            else:
-                self.dof_limits_lower.append(dof_prop['lower'][j])
-                self.dof_limits_upper.append(dof_prop['upper'][j])
+        # dof_prop = self.gym.get_actor_dof_properties(self.envs[0], self.humanoid_handles[0])
+        # for j in range(self.num_dof):
+        #     if dof_prop['lower'][j] > dof_prop['upper'][j]:
+        #         self.dof_limits_lower.append(dof_prop['upper'][j])
+        #         self.dof_limits_upper.append(dof_prop['lower'][j])
+        #     else:
+        #         self.dof_limits_lower.append(dof_prop['lower'][j])
+        #         self.dof_limits_upper.append(dof_prop['upper'][j])
 
-        self.dof_limits_lower = to_torch(self.dof_limits_lower, device=self.device)
-        self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self.device)
+        # self.dof_limits_lower = to_torch(self.dof_limits_lower, device=self.device)
+        # self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self.device)
+
+        # collect per-actor dof limits (lower, upper already corrected for swapped bounds)
+        dof_lowers_all = []
+        dof_uppers_all = []
+
+        for env, handle in zip(self.envs, self.humanoid_handles):
+            dof_prop = self.gym.get_actor_dof_properties(env, handle)
+
+            # fix swapped bounds per DOF
+            lower = np.minimum(dof_prop['lower'], dof_prop['upper'])
+            upper = np.maximum(dof_prop['lower'], dof_prop['upper'])
+
+            dof_lowers_all.append(lower)
+            dof_uppers_all.append(upper)
+
+        # shape: [num_actors, num_dof]
+        dof_lowers_all = to_torch(np.stack(dof_lowers_all, axis=0), device=self.device)
+        dof_uppers_all = to_torch(np.stack(dof_uppers_all, axis=0), device=self.device)
+
+        # global per-DOF limits across all actors
+        self.dof_limits_lower, _ = torch.min(dof_lowers_all, dim=0)  # [num_dof]
+        self.dof_limits_upper, _ = torch.max(dof_uppers_all, dim=0)  # [num_dof]
 
         if (self._pd_control):
             self._build_pd_action_offset_scale()
@@ -457,6 +487,94 @@ class Humanoid(BaseTask):
         start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", col_group, col_filter, segmentation_id)
+
+        # ---- 1211 actions debug the template ---
+        body_props = self.gym.get_actor_rigid_body_properties(env_ptr, humanoid_handle)
+
+        masses = [bp.mass for bp in body_props]
+        inertia_eigs = []
+        for bp in body_props:
+            I = mat33_to_np(bp.inertia).reshape(3, 3)   # inertia is 3×3, row-major
+            eigs = np.linalg.eigvals(I)
+            inertia_eigs.append(eigs)
+
+        ASYM_TOL      = 1e-5   # how non-symmetric is allowed
+        EIG_MIN_TOL   = 1e-6   # min allowed eigenvalue (after symmetrisation)
+        EIG_IMAG_TOL  = 1e-6   # max allowed imaginary part
+
+        for i, bp in enumerate(body_props):
+            I = mat33_to_np(bp.inertia).reshape(3, 3)
+
+            # symmetry check
+            asym_norm = np.linalg.norm(I - I.T)
+
+            # eigenvalues of raw I (may be complex)
+            eigs = np.linalg.eigvals(I)
+            real = eigs.real
+            imag = eigs.imag
+
+            # also check eigenvalues of a symmetrised inertia (physically what we want)
+            I_sym = 0.5 * (I + I.T)
+            eigs_sym = np.linalg.eigvalsh(I_sym)  # real by construction
+
+            bad_asym = asym_norm > ASYM_TOL
+            bad_imag = np.max(np.abs(imag)) > EIG_IMAG_TOL
+            bad_real = np.min(eigs_sym) < EIG_MIN_TOL   # near-zero or negative
+
+            if bad_asym or bad_imag or bad_real:
+                print(f"[WARN] env {env_id} body {i}")
+                print("I =\n", I)
+                print("asym_norm:", asym_norm)
+                print("eigs (raw):", eigs)
+                print("eigs (sym):", eigs_sym)
+
+        min_mass   = float(np.min(masses))
+        max_mass   = float(np.max(masses))
+        total_mass = float(np.sum(masses))
+        min_I_eig  = float(np.min([e.min() for e in inertia_eigs]))
+        
+        # print("mass min/max/total:", min_mass, max_mass, total_mass)
+        # print("inertia eigen min:", min_I_eig)
+
+        # ---- Heuristic thresholds (for human-scale characters) ----
+        MIN_SAFE_MASS          = 0.02      # kg, per-link minimum
+        MAX_SAFE_MASS_RATIO    = 200.0     # max_mass / min_mass
+        MIN_SAFE_TOTAL_MASS    = 20.0      # kg
+        MAX_SAFE_TOTAL_MASS    = 120.0     # kg
+        MIN_SAFE_INERTIA_EIG   = 1e-5      # kg·m^2
+
+        messages = []
+
+        # Mass checks
+        if min_mass < MIN_SAFE_MASS:
+            messages.append(f"[WARN] min mass too small: {min_mass:.4f} kg (threshold {MIN_SAFE_MASS} kg)")
+
+        mass_ratio = max_mass / min_mass if min_mass > 0 else float("inf")
+        if mass_ratio > MAX_SAFE_MASS_RATIO:
+            messages.append(f"[WARN] mass ratio too large: {mass_ratio:.1f} (threshold {MAX_SAFE_MASS_RATIO})")
+
+        if not (MIN_SAFE_TOTAL_MASS <= total_mass <= MAX_SAFE_TOTAL_MASS):
+            messages.append(
+                f"[WARN] total mass {total_mass:.2f} kg outside [{MIN_SAFE_TOTAL_MASS}, {MAX_SAFE_TOTAL_MASS}] kg"
+            )
+
+        # Inertia checks
+        if min_I_eig < MIN_SAFE_INERTIA_EIG:
+            messages.append(
+                f"[WARN] minimum inertia eigenvalue too small: {min_I_eig:.3e} "
+                f"(threshold {MIN_SAFE_INERTIA_EIG:.1e})"
+            )
+
+        # Print summary
+        if messages:
+            print(f"{env_id}: env_id")
+            print("=== PHYSICAL PROPERTY CHECK: POTENTIAL ISSUES DETECTED ===!!!!!!!!!!!!")
+            for msg in messages:
+                print(msg)
+        else:
+            # print("=== PHYSICAL PROPERTY CHECK: within conservative safety thresholds ===")
+            pass
+        # ---- 1211 actions debug the template ---
 
         self.gym.enable_actor_dof_force_sensors(env_ptr, humanoid_handle)
 
