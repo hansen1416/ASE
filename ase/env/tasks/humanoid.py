@@ -814,7 +814,7 @@ class Humanoid(BaseTask):
         self._cam_prev_char_pos = self._humanoid_root_states[0, 0:3].cpu().numpy()
         
         cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0] - 1.0, 
-                              self._cam_prev_char_pos[1] - 3.0, 
+                              self._cam_prev_char_pos[1] - 6.0, 
                               2.0)
         cam_target = gymapi.Vec3(self._cam_prev_char_pos[0],
                                  self._cam_prev_char_pos[1],
