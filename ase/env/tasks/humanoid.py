@@ -241,6 +241,21 @@ class Humanoid(BaseTask):
         self._termination_heights = to_torch(self._termination_heights, device=self.device)
         return
 
+    def _compute_safe_root_height(self, template_id: int) -> float:
+        """
+        ---- 1211 actions
+        Heuristic: use the first SMPL beta (roughly correlated with height)
+        to scale a base height, then add a small margin. This is just a
+        robust guess; tune coefficients empirically.
+        """
+        betas = self._template_betas[template_id]          # [B]
+        beta_height = float(betas[0].clamp(-3.0, 3.0))     # avoid extremes
+        height_scale = 1.0 + 0.15 * beta_height            # ~±45% over ±3
+        safe_h = self._base_char_height * height_scale + self._spawn_height_margin
+        # avoid silly values
+        safe_h = max(0.4, min(2.0, safe_h))
+        return safe_h
+
     def _create_envs(self, num_envs, spacing, num_per_row):
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
@@ -252,6 +267,33 @@ class Humanoid(BaseTask):
         asset_options.angular_damping = 0.01
         asset_options.max_angular_velocity = 100.0
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+
+        # ---- 1211 actions robust convex decomposition & inertia overrides ----
+        # Use VHACD (volumetric hierarchical approximate convex decomposition)
+        # so that arbitrary meshes are approximated by a set of convex shapes.
+        # This tends to produce more stable contact behavior than raw triangle meshes.
+        asset_options.vhacd_enabled = True
+
+        # Ignore the center-of-mass from the imported asset and recompute it
+        # from the (possibly VHACD-processed) collision geometry. This keeps
+        # COM consistent with the new convex shapes and improves balance.
+        asset_options.override_com = True
+
+        # Ignore the inertia tensor from the imported asset and recompute it
+        # from the processed collision geometry. This avoids pathological
+        # inertia values when the original mesh or scaling is irregular.
+        asset_options.override_inertia = True
+
+        # Merge rigid bodies that are connected by fixed joints into a single
+        # rigid body where possible. This reduces joint count and can remove
+        # tiny, jitter-prone segments, leading to more stable simulation.
+        asset_options.collapse_fixed_joints = True
+
+        # Automatically replace cylinders in the collision geometry with
+        # capsules, which generally have more robust contact behavior and
+        # fewer edge cases in PhysX than cylinders.
+        asset_options.replace_cylinder_with_capsule = True
+        # ---- 1211 actions ---------------------------------------------------------
 
         # multi humanoid template change ===============
         motor_efforts = None
@@ -350,6 +392,12 @@ class Humanoid(BaseTask):
         self._template_ids_env = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         # ---- debug: detect non-finite physics state ----
         # load beta into observation ===============
+
+        # ---- 1211 actions new: morphology-aware root heights ---
+        self._base_char_height = self.cfg["env"].get("base_char_height", 0.89)
+        self._spawn_height_margin = self.cfg["env"].get("spawn_height_margin", 0.05)
+        self._safe_root_heights = torch.zeros(self.num_envs, device=self.device)
+        # ---- 1211 actions ------------------------------------------
         
         for i in range(self.num_envs):
             # create env instance
@@ -367,6 +415,10 @@ class Humanoid(BaseTask):
             self._template_ids_env[i] = template_id
             # ---- debug: detect non-finite physics state ----
             # load beta into observation ===============
+
+            # ---- 1211 actions new: cache a safe spawn height for this env ---
+            self._safe_root_heights[i] = self._compute_safe_root_height(template_id)
+            # ---------------------------------------------------
 
             self._build_env(i, env_ptr, h_asset)
             # multi humanoid template change ===============
@@ -395,7 +447,11 @@ class Humanoid(BaseTask):
         segmentation_id = 0
 
         start_pose = gymapi.Transform()
-        char_h = 0.89
+        # char_h = 0.89
+
+        # ---- 1211 morphology-aware spawn height ---
+        char_h = float(self._safe_root_heights[env_id])
+        # --------------------------------------
 
         start_pose.p = gymapi.Vec3(*get_axis_params(char_h, self.up_axis_idx))
         start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)

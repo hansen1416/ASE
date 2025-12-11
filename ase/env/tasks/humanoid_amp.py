@@ -251,6 +251,13 @@ class HumanoidAMP(Humanoid):
 
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                = self._motion_lib.get_motion_state(motion_ids, motion_times)
+        
+        # ---- 1211 --- enforce morphology-aware safe height on z ---
+        safe_h = self._safe_root_heights[env_ids].unsqueeze(-1)  # [N, 1]
+        z = root_pos[:, 2:3]
+        root_pos = root_pos.clone()
+        root_pos[:, 2:3] = torch.maximum(z, safe_h)
+        # -------------------------------------------------
 
         self._set_env_state(env_ids=env_ids, 
                             root_pos=root_pos, 
