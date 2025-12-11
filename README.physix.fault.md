@@ -2,25 +2,6 @@
 
 ---
 
-## 1. Physics configuration (YAML)
-
-**Where**
-
-* Training config YAML (loaded in `run.py` via `load_cfg(args)`), inside the `sim` / `sim.physx` section.
-
-**What**
-
-* Set conservative PhysX parameters, e.g.:
-
-  * `max_depenetration_velocity` ≈ `5.0`–`10.0`
-  * `substeps` = `2` or `4` (not `1`)
-  * `solver_type` = `1` (TGS)
-  * `bounce_threshold_velocity` ≈ `0.5`
-  * `contact_offset` ≈ `0.01`
-* Goal: avoid violent depenetration impulses and improve stability for varied body shapes.
-
----
-
 ## 2. Asset loading: inertia and self-collision
 
 **Where**

@@ -1,0 +1,3 @@
+- reverse 1211 actions
+- try with safe humanoid
+- find out why the 12 humanoids are faulty
