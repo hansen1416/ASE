@@ -276,32 +276,32 @@ class Humanoid(BaseTask):
         asset_options.max_angular_velocity = 100.0
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
 
-        # ---- 1211 actions robust convex decomposition & inertia overrides ----
-        # Use VHACD (volumetric hierarchical approximate convex decomposition)
-        # so that arbitrary meshes are approximated by a set of convex shapes.
-        # This tends to produce more stable contact behavior than raw triangle meshes.
-        asset_options.vhacd_enabled = True
+        # # ---- 1211 actions robust convex decomposition & inertia overrides ----
+        # # Use VHACD (volumetric hierarchical approximate convex decomposition)
+        # # so that arbitrary meshes are approximated by a set of convex shapes.
+        # # This tends to produce more stable contact behavior than raw triangle meshes.
+        # asset_options.vhacd_enabled = True
 
-        # Ignore the center-of-mass from the imported asset and recompute it
-        # from the (possibly VHACD-processed) collision geometry. This keeps
-        # COM consistent with the new convex shapes and improves balance.
-        asset_options.override_com = True
+        # # Ignore the center-of-mass from the imported asset and recompute it
+        # # from the (possibly VHACD-processed) collision geometry. This keeps
+        # # COM consistent with the new convex shapes and improves balance.
+        # asset_options.override_com = True
 
-        # Ignore the inertia tensor from the imported asset and recompute it
-        # from the processed collision geometry. This avoids pathological
-        # inertia values when the original mesh or scaling is irregular.
-        asset_options.override_inertia = True
+        # # Ignore the inertia tensor from the imported asset and recompute it
+        # # from the processed collision geometry. This avoids pathological
+        # # inertia values when the original mesh or scaling is irregular.
+        # asset_options.override_inertia = True
 
-        # Merge rigid bodies that are connected by fixed joints into a single
-        # rigid body where possible. This reduces joint count and can remove
-        # tiny, jitter-prone segments, leading to more stable simulation.
-        asset_options.collapse_fixed_joints = True
+        # # Merge rigid bodies that are connected by fixed joints into a single
+        # # rigid body where possible. This reduces joint count and can remove
+        # # tiny, jitter-prone segments, leading to more stable simulation.
+        # asset_options.collapse_fixed_joints = True
 
-        # Automatically replace cylinders in the collision geometry with
-        # capsules, which generally have more robust contact behavior and
-        # fewer edge cases in PhysX than cylinders.
-        asset_options.replace_cylinder_with_capsule = True
-        # ---- 1211 actions ---------------------------------------------------------
+        # # Automatically replace cylinders in the collision geometry with
+        # # capsules, which generally have more robust contact behavior and
+        # # fewer edge cases in PhysX than cylinders.
+        # asset_options.replace_cylinder_with_capsule = True
+        # # ---- 1211 actions ---------------------------------------------------------
 
         # multi humanoid template change ===============
         motor_efforts = None
@@ -488,93 +488,93 @@ class Humanoid(BaseTask):
 
         humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", col_group, col_filter, segmentation_id)
 
-        # ---- 1211 actions debug the template ---
-        body_props = self.gym.get_actor_rigid_body_properties(env_ptr, humanoid_handle)
+        # # ---- 1211 actions debug the template ---
+        # body_props = self.gym.get_actor_rigid_body_properties(env_ptr, humanoid_handle)
 
-        masses = [bp.mass for bp in body_props]
-        inertia_eigs = []
-        for bp in body_props:
-            I = mat33_to_np(bp.inertia).reshape(3, 3)   # inertia is 3×3, row-major
-            eigs = np.linalg.eigvals(I)
-            inertia_eigs.append(eigs)
+        # masses = [bp.mass for bp in body_props]
+        # inertia_eigs = []
+        # for bp in body_props:
+        #     I = mat33_to_np(bp.inertia).reshape(3, 3)   # inertia is 3×3, row-major
+        #     eigs = np.linalg.eigvals(I)
+        #     inertia_eigs.append(eigs)
 
-        ASYM_TOL      = 1e-5   # how non-symmetric is allowed
-        EIG_MIN_TOL   = 1e-6   # min allowed eigenvalue (after symmetrisation)
-        EIG_IMAG_TOL  = 1e-6   # max allowed imaginary part
+        # ASYM_TOL      = 1e-5   # how non-symmetric is allowed
+        # EIG_MIN_TOL   = 1e-6   # min allowed eigenvalue (after symmetrisation)
+        # EIG_IMAG_TOL  = 1e-6   # max allowed imaginary part
 
-        for i, bp in enumerate(body_props):
-            I = mat33_to_np(bp.inertia).reshape(3, 3)
+        # for i, bp in enumerate(body_props):
+        #     I = mat33_to_np(bp.inertia).reshape(3, 3)
 
-            # symmetry check
-            asym_norm = np.linalg.norm(I - I.T)
+        #     # symmetry check
+        #     asym_norm = np.linalg.norm(I - I.T)
 
-            # eigenvalues of raw I (may be complex)
-            eigs = np.linalg.eigvals(I)
-            real = eigs.real
-            imag = eigs.imag
+        #     # eigenvalues of raw I (may be complex)
+        #     eigs = np.linalg.eigvals(I)
+        #     real = eigs.real
+        #     imag = eigs.imag
 
-            # also check eigenvalues of a symmetrised inertia (physically what we want)
-            I_sym = 0.5 * (I + I.T)
-            eigs_sym = np.linalg.eigvalsh(I_sym)  # real by construction
+        #     # also check eigenvalues of a symmetrised inertia (physically what we want)
+        #     I_sym = 0.5 * (I + I.T)
+        #     eigs_sym = np.linalg.eigvalsh(I_sym)  # real by construction
 
-            bad_asym = asym_norm > ASYM_TOL
-            bad_imag = np.max(np.abs(imag)) > EIG_IMAG_TOL
-            bad_real = np.min(eigs_sym) < EIG_MIN_TOL   # near-zero or negative
+        #     bad_asym = asym_norm > ASYM_TOL
+        #     bad_imag = np.max(np.abs(imag)) > EIG_IMAG_TOL
+        #     bad_real = np.min(eigs_sym) < EIG_MIN_TOL   # near-zero or negative
 
-            if bad_asym or bad_imag or bad_real:
-                print(f"[WARN] env {env_id} body {i}")
-                print("I =\n", I)
-                print("asym_norm:", asym_norm)
-                print("eigs (raw):", eigs)
-                print("eigs (sym):", eigs_sym)
+        #     if bad_asym or bad_imag or bad_real:
+        #         print(f"[WARN] env {env_id} body {i}")
+        #         print("I =\n", I)
+        #         print("asym_norm:", asym_norm)
+        #         print("eigs (raw):", eigs)
+        #         print("eigs (sym):", eigs_sym)
 
-        min_mass   = float(np.min(masses))
-        max_mass   = float(np.max(masses))
-        total_mass = float(np.sum(masses))
-        min_I_eig  = float(np.min([e.min() for e in inertia_eigs]))
+        # min_mass   = float(np.min(masses))
+        # max_mass   = float(np.max(masses))
+        # total_mass = float(np.sum(masses))
+        # min_I_eig  = float(np.min([e.min() for e in inertia_eigs]))
         
-        # print("mass min/max/total:", min_mass, max_mass, total_mass)
-        # print("inertia eigen min:", min_I_eig)
+        # # print("mass min/max/total:", min_mass, max_mass, total_mass)
+        # # print("inertia eigen min:", min_I_eig)
 
-        # ---- Heuristic thresholds (for human-scale characters) ----
-        MIN_SAFE_MASS          = 0.02      # kg, per-link minimum
-        MAX_SAFE_MASS_RATIO    = 200.0     # max_mass / min_mass
-        MIN_SAFE_TOTAL_MASS    = 20.0      # kg
-        MAX_SAFE_TOTAL_MASS    = 120.0     # kg
-        MIN_SAFE_INERTIA_EIG   = 1e-5      # kg·m^2
+        # # ---- Heuristic thresholds (for human-scale characters) ----
+        # MIN_SAFE_MASS          = 0.02      # kg, per-link minimum
+        # MAX_SAFE_MASS_RATIO    = 200.0     # max_mass / min_mass
+        # MIN_SAFE_TOTAL_MASS    = 20.0      # kg
+        # MAX_SAFE_TOTAL_MASS    = 120.0     # kg
+        # MIN_SAFE_INERTIA_EIG   = 1e-5      # kg·m^2
 
-        messages = []
+        # messages = []
 
-        # Mass checks
-        if min_mass < MIN_SAFE_MASS:
-            messages.append(f"[WARN] min mass too small: {min_mass:.4f} kg (threshold {MIN_SAFE_MASS} kg)")
+        # # Mass checks
+        # if min_mass < MIN_SAFE_MASS:
+        #     messages.append(f"[WARN] min mass too small: {min_mass:.4f} kg (threshold {MIN_SAFE_MASS} kg)")
 
-        mass_ratio = max_mass / min_mass if min_mass > 0 else float("inf")
-        if mass_ratio > MAX_SAFE_MASS_RATIO:
-            messages.append(f"[WARN] mass ratio too large: {mass_ratio:.1f} (threshold {MAX_SAFE_MASS_RATIO})")
+        # mass_ratio = max_mass / min_mass if min_mass > 0 else float("inf")
+        # if mass_ratio > MAX_SAFE_MASS_RATIO:
+        #     messages.append(f"[WARN] mass ratio too large: {mass_ratio:.1f} (threshold {MAX_SAFE_MASS_RATIO})")
 
-        if not (MIN_SAFE_TOTAL_MASS <= total_mass <= MAX_SAFE_TOTAL_MASS):
-            messages.append(
-                f"[WARN] total mass {total_mass:.2f} kg outside [{MIN_SAFE_TOTAL_MASS}, {MAX_SAFE_TOTAL_MASS}] kg"
-            )
+        # if not (MIN_SAFE_TOTAL_MASS <= total_mass <= MAX_SAFE_TOTAL_MASS):
+        #     messages.append(
+        #         f"[WARN] total mass {total_mass:.2f} kg outside [{MIN_SAFE_TOTAL_MASS}, {MAX_SAFE_TOTAL_MASS}] kg"
+        #     )
 
-        # Inertia checks
-        if min_I_eig < MIN_SAFE_INERTIA_EIG:
-            messages.append(
-                f"[WARN] minimum inertia eigenvalue too small: {min_I_eig:.3e} "
-                f"(threshold {MIN_SAFE_INERTIA_EIG:.1e})"
-            )
+        # # Inertia checks
+        # if min_I_eig < MIN_SAFE_INERTIA_EIG:
+        #     messages.append(
+        #         f"[WARN] minimum inertia eigenvalue too small: {min_I_eig:.3e} "
+        #         f"(threshold {MIN_SAFE_INERTIA_EIG:.1e})"
+        #     )
 
-        # Print summary
-        if messages:
-            print(f"{env_id}: env_id")
-            print("=== PHYSICAL PROPERTY CHECK: POTENTIAL ISSUES DETECTED ===!!!!!!!!!!!!")
-            for msg in messages:
-                print(msg)
-        else:
-            # print("=== PHYSICAL PROPERTY CHECK: within conservative safety thresholds ===")
-            pass
-        # ---- 1211 actions debug the template ---
+        # # Print summary
+        # if messages:
+        #     print(f"{env_id}: env_id")
+        #     print("=== PHYSICAL PROPERTY CHECK: POTENTIAL ISSUES DETECTED ===!!!!!!!!!!!!")
+        #     for msg in messages:
+        #         print(msg)
+        # else:
+        #     # print("=== PHYSICAL PROPERTY CHECK: within conservative safety thresholds ===")
+        #     pass
+        # # ---- 1211 actions debug the template ---
 
         self.gym.enable_actor_dof_force_sensors(env_ptr, humanoid_handle)
 
