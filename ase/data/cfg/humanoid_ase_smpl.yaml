@@ -44,7 +44,6 @@ env:
 
   asset:
     assetRoot: "ase/data/assets"
-    assetType: "smpl"
     assetFileName:
       - mjcf/smpl/a0f02530_smpl.xml
       - mjcf/smpl/b156eebd_smpl.xml
