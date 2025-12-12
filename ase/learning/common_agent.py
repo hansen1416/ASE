@@ -116,9 +116,9 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 scaled_play_time = train_info['play_time']
                 curr_frames = self.curr_frames
                 self.frame += curr_frames
-                if self.print_stats:
-                    fps_step = curr_frames / scaled_play_time
-                    fps_total = curr_frames / scaled_time
+                # if self.print_stats:
+                #     fps_step = curr_frames / scaled_play_time
+                #     fps_total = curr_frames / scaled_time
                     # print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
 
                 self.writer.add_scalar('performance/total_fps', curr_frames / scaled_time, frame)
@@ -145,11 +145,17 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
                 if self.save_freq > 0:
                     if (epoch_num % self.save_freq == 0):
-                        self.save(model_output_file + '_' + str(epoch_num))
+                        
+                        # save only if mean reward > 250
+                        mr = np.mean(mean_rewards) # an average across value heads
+                        mr = float(mr.item() if hasattr(mr, "item") else mr)
 
-                        if (self._save_intermediate):
-                            int_model_output_file = model_output_file + '_' + str(epoch_num).zfill(8)
-                            self.save(int_model_output_file)
+                        if mr > 250.0:
+                            self.save(model_output_file + '_' + str(epoch_num))
+
+                            if (self._save_intermediate):
+                                int_model_output_file = model_output_file + '_' + str(epoch_num).zfill(8)
+                                self.save(int_model_output_file)
 
                         # custom print log =======================
                         log_parts = [f'fps step: {(curr_frames / scaled_play_time):.1f} fps total: {(curr_frames / scaled_time):.1f}']
