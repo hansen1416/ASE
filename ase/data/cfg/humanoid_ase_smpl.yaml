@@ -53,7 +53,6 @@ env:
       - mjcf/smpl/1f0234a6_smpl.xml
       - mjcf/smpl/aaab922b_smpl.xml
       - mjcf/smpl/97d89d08_smpl.xml
-
       - mjcf/smpl/f16065b0_smpl.xml
       - mjcf/smpl/5dcdf59a_smpl.xml
       - mjcf/smpl/f00a7a9f_smpl.xml
@@ -62,7 +61,6 @@ env:
       - mjcf/smpl/5636a12a_smpl.xml
       - mjcf/smpl/33a17abb_smpl.xml
       - mjcf/smpl/124f1e57_smpl.xml
-
       - mjcf/smpl/e585e9fd_smpl.xml
       - mjcf/smpl/520ed34f_smpl.xml
       - mjcf/smpl/5dbdeb54_smpl.xml
@@ -71,7 +69,6 @@ env:
       - mjcf/smpl/f0f7976f_smpl.xml
       - mjcf/smpl/20cf78b3_smpl.xml
       - mjcf/smpl/f56ef3f7_smpl.xml
-
       - mjcf/smpl/fba2c39a_smpl.xml
       - mjcf/smpl/b80aed9f_smpl.xml
       - mjcf/smpl/706ed6c9_smpl.xml
@@ -80,7 +77,6 @@ env:
       - mjcf/smpl/bc793600_smpl.xml
       - mjcf/smpl/74fc526e_smpl.xml
       - mjcf/smpl/09016021_smpl.xml
-
       - mjcf/smpl/6895f004_smpl.xml
       - mjcf/smpl/602dbc36_smpl.xml
       - mjcf/smpl/22e9a6f8_smpl.xml
@@ -89,7 +85,6 @@ env:
       - mjcf/smpl/dc46f761_smpl.xml
       - mjcf/smpl/c51c47d2_smpl.xml
       - mjcf/smpl/3577c351_smpl.xml
-
       - mjcf/smpl/18ce6b2c_smpl.xml
       - mjcf/smpl/ef892c76_smpl.xml
       - mjcf/smpl/349bdc0e_smpl.xml
@@ -98,7 +93,6 @@ env:
       - mjcf/smpl/8a24b3b7_smpl.xml
       - mjcf/smpl/00c972db_smpl.xml
       - mjcf/smpl/6046abb1_smpl.xml
-
       - mjcf/smpl/76144ae7_smpl.xml
       - mjcf/smpl/e698f1e8_smpl.xml
       - mjcf/smpl/b944e212_smpl.xml
