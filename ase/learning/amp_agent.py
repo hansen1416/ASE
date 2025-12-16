@@ -668,5 +668,5 @@ class AMPAgent(common_agent.CommonAgent):
 
             disc_pred = disc_pred.detach().cpu().numpy()[0, 0]
             disc_reward = disc_reward.cpu().numpy()[0, 0]
-            print("disc_pred: ", disc_pred, disc_reward)
+            # print("disc_pred: ", disc_pred, disc_reward)
         return
