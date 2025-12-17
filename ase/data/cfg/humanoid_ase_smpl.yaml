@@ -98,8 +98,6 @@ env:
       - mjcf/smpl/e698f1e8_smpl.xml
       - mjcf/smpl/b944e212_smpl.xml
       - mjcf/smpl/2a31c8ac_smpl.xml
-
-      # faulty 12
       - mjcf/smpl/7e43c211_smpl.xml
       - mjcf/smpl/b3428686_smpl.xml
       - mjcf/smpl/0e091a72_smpl.xml
