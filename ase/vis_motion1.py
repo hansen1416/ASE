@@ -85,6 +85,10 @@ if not asset_file_list:
     print("*** No SMPL assets found in", asset_root)
     quit()
 
+exclude_set= [os.path.join(asset_root,"aaab922b_smpl.xml"), os.path.join(asset_root,"6803e1fa_smpl.xml")]
+
+asset_file_list = [s for s in asset_file_list if s not in exclude_set]
+
 print("Found", len(asset_file_list), "SMPL assets")
 
 num_actors = len(asset_file_list)
