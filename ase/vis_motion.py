@@ -79,9 +79,12 @@ if viewer is None:
     quit()
 
 asset_root = os.path.join("ase", "data", "assets", "mjcf", "smpl")
-# asset_file = "7e43c211_smpl.xml"
-asset_file = "b3428686_smpl.xml"
-asset_file = "0e091a72_smpl.xml"
+
+asset_file = "aaab922b_smpl.xml"
+# asset_file = "6803e1fa_smpl.xml"
+
+
+asset_file = "638a4fb7_smpl.xml"
 
 
 sk_tree = SkeletonTree.from_mjcf(osp.join(asset_root, asset_file))

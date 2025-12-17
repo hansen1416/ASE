@@ -51,7 +51,6 @@ env:
       # - mjcf/smpl/aef91182_smpl.xml
       # - mjcf/smpl/0c3f729e_smpl.xml
       # - mjcf/smpl/1f0234a6_smpl.xml
-      # - mjcf/smpl/aaab922b_smpl.xml
       # - mjcf/smpl/97d89d08_smpl.xml
       # - mjcf/smpl/f16065b0_smpl.xml
       # - mjcf/smpl/5dcdf59a_smpl.xml
@@ -77,39 +76,40 @@ env:
       # - mjcf/smpl/bc793600_smpl.xml
       # - mjcf/smpl/74fc526e_smpl.xml
       # - mjcf/smpl/09016021_smpl.xml
+      # - mjcf/smpl/6895f004_smpl.xml
+      # - mjcf/smpl/602dbc36_smpl.xml
+      # - mjcf/smpl/22e9a6f8_smpl.xml
+      # - mjcf/smpl/85011266_smpl.xml
+      # - mjcf/smpl/9f630f94_smpl.xml
+      # - mjcf/smpl/dc46f761_smpl.xml
+      # - mjcf/smpl/c51c47d2_smpl.xml
+      # - mjcf/smpl/3577c351_smpl.xml
+      # - mjcf/smpl/18ce6b2c_smpl.xml
+      # - mjcf/smpl/ef892c76_smpl.xml
+      # - mjcf/smpl/349bdc0e_smpl.xml
+      # - mjcf/smpl/e9f8d7a4_smpl.xml
+      # - mjcf/smpl/8a24b3b7_smpl.xml
+      # - mjcf/smpl/00c972db_smpl.xml
+      # - mjcf/smpl/6046abb1_smpl.xml
+      # - mjcf/smpl/76144ae7_smpl.xml
+      # - mjcf/smpl/e698f1e8_smpl.xml
+      # - mjcf/smpl/b944e212_smpl.xml
+      # - mjcf/smpl/2a31c8ac_smpl.xml
+      # - mjcf/smpl/7e43c211_smpl.xml
+      # - mjcf/smpl/b3428686_smpl.xml
+      # - mjcf/smpl/0e091a72_smpl.xml
+      # - mjcf/smpl/aca66100_smpl.xml
+      # - mjcf/smpl/af4dbe08_smpl.xml
+      # - mjcf/smpl/75e01b05_smpl.xml
+      # - mjcf/smpl/31f56211_smpl.xml
+      # - mjcf/smpl/0f637664_smpl.xml
+      # - mjcf/smpl/ef483c8a_smpl.xml
+      # - mjcf/smpl/15c4d2e9_smpl.xml
+      # - mjcf/smpl/0a1ece18_smpl.xml
+      # - mjcf/smpl/638a4fb7_smpl.xml
 
-      - mjcf/smpl/6895f004_smpl.xml
-      - mjcf/smpl/602dbc36_smpl.xml
-      - mjcf/smpl/22e9a6f8_smpl.xml
-      - mjcf/smpl/85011266_smpl.xml
-      - mjcf/smpl/9f630f94_smpl.xml
-      - mjcf/smpl/dc46f761_smpl.xml
-      - mjcf/smpl/c51c47d2_smpl.xml
-      - mjcf/smpl/3577c351_smpl.xml
-      - mjcf/smpl/18ce6b2c_smpl.xml
-      - mjcf/smpl/ef892c76_smpl.xml
-      - mjcf/smpl/349bdc0e_smpl.xml
       - mjcf/smpl/6803e1fa_smpl.xml
-      - mjcf/smpl/e9f8d7a4_smpl.xml
-      - mjcf/smpl/8a24b3b7_smpl.xml
-      - mjcf/smpl/00c972db_smpl.xml
-      - mjcf/smpl/6046abb1_smpl.xml
-      - mjcf/smpl/76144ae7_smpl.xml
-      - mjcf/smpl/e698f1e8_smpl.xml
-      - mjcf/smpl/b944e212_smpl.xml
-      - mjcf/smpl/2a31c8ac_smpl.xml
-      - mjcf/smpl/7e43c211_smpl.xml
-      - mjcf/smpl/b3428686_smpl.xml
-      - mjcf/smpl/0e091a72_smpl.xml
-      - mjcf/smpl/aca66100_smpl.xml
-      - mjcf/smpl/af4dbe08_smpl.xml
-      - mjcf/smpl/75e01b05_smpl.xml
-      - mjcf/smpl/31f56211_smpl.xml
-      - mjcf/smpl/0f637664_smpl.xml
-      - mjcf/smpl/ef483c8a_smpl.xml
-      - mjcf/smpl/15c4d2e9_smpl.xml
-      - mjcf/smpl/0a1ece18_smpl.xml
-      - mjcf/smpl/638a4fb7_smpl.xml
+      - mjcf/smpl/aaab922b_smpl.xml
 
   plane:
     staticFriction: 1.0
