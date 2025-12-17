@@ -480,7 +480,7 @@ class Humanoid(BaseTask):
         # char_h = 0.89
 
         # ---- 1211 morphology-aware spawn height ---
-        char_h = float(self._safe_root_heights[env_id])
+        char_h = float(self._safe_root_heights[env_id]) + 0.1
         # --------------------------------------
 
         start_pose.p = gymapi.Vec3(*get_axis_params(char_h, self.up_axis_idx))
