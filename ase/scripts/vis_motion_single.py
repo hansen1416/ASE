@@ -26,14 +26,10 @@ import os.path as osp
 
 sys.path.append(os.getcwd())
 
-import joblib
 import numpy as np
 from isaacgym import gymapi, gymutil, gymtorch
 import torch
-from utils.motion_lib_smpl import MotionLibSMPL
 from poselib.poselib.skeleton.skeleton3d import SkeletonTree
-from easydict import EasyDict
-from utils.motion_lib_base import FixHeightMode
 
 # parse arguments
 args = gymutil.parse_arguments(description="Joint monkey: Animate collision box",
@@ -51,11 +47,19 @@ sim_params.up_axis = gymapi.UP_AXIS_Z
 sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.81)
 
 sim_params.physx.solver_type = 1
-sim_params.physx.num_position_iterations = 6
+sim_params.physx.num_threads = 0
+sim_params.physx.use_gpu = True
+sim_params.use_gpu_pipeline = True
+
+sim_params.physx.num_position_iterations = 4
 sim_params.physx.num_velocity_iterations = 0
-sim_params.physx.num_threads = args.num_threads
-sim_params.physx.use_gpu = args.use_gpu
-sim_params.use_gpu_pipeline = args.use_gpu_pipeline
+
+# sim_params.physx.contact_offset = 0.005  # Default 0.02; smaller detects sooner
+# sim_params.physx.rest_offset = 0.001  # Default 0.0; small positive reduces jitter
+# sim_params.physx.bounce_threshold_velocity = 0.2  # Reduce bouncing
+# sim_params.physx.max_depenetration_velocity = 0.0001  # Limit penetration correction speed
+# sim_params.physx.default_buffer_size_multiplier = 5.0  # Increase for complex contacts
+# sim_params.physx.contact_collection = gymapi.CC_LAST_SUBSTEP  # CC_LAST (more accurate but slower)
 
 sim = gym.create_sim(args.compute_device_id, args.graphics_device_id, args.physics_engine, sim_params)
 if sim is None:
@@ -84,8 +88,7 @@ asset_root = os.path.join(project_dir, "data", "assets", "mjcf", "smpl")
 asset_file = "aaab922b_smpl.xml"
 # asset_file = "6803e1fa_smpl.xml"
 
-
-asset_file = "638a4fb7_smpl.xml"
+# asset_file = "638a4fb7_smpl.xml"
 
 
 sk_tree = SkeletonTree.from_mjcf(osp.join(asset_root, asset_file))
@@ -121,7 +124,7 @@ envs.append(env)
 
 # add actor
 pose = gymapi.Transform()
-pose.p = gymapi.Vec3(0.,  0.,  0.8900)
+pose.p = gymapi.Vec3(0.,  0.,  1.0)
 pose.r = gymapi.Quat(0, 0.0, 0.0, 1)
 
 actor_handle = gym.create_actor(env, asset, pose, "actor", 0, 1)
@@ -149,6 +152,8 @@ gym.set_actor_dof_states(env, actor_handle, dof_states, gymapi.STATE_ALL)
 
 props = gym.get_actor_dof_properties(env, actor_handle)
 props["driveMode"].fill(gymapi.DOF_MODE_POS)            # PD position mode
+# props["stiffness"].fill(10.0)
+# props["damping"].fill(2.0)
 # Reasonable generic gains (tune to match training if needed)
 
 gym.set_actor_dof_properties(env, actor_handle, props) 
