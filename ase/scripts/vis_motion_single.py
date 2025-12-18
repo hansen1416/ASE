@@ -86,7 +86,7 @@ project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 asset_root = os.path.join(project_dir, "data", "assets", "mjcf", "smpl")
 
 asset_file = "aaab922b_smpl.xml"
-# asset_file = "6803e1fa_smpl.xml"
+asset_file = "6803e1fa_smpl.xml"
 
 # asset_file = "638a4fb7_smpl.xml"
 

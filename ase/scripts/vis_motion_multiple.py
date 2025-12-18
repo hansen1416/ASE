@@ -154,7 +154,7 @@ for i in range(num_actors):
     y_pos = (row - (num_rows - 1) / 2.0) * actor_spacing
 
     pose = gymapi.Transform()
-    pose.p = gymapi.Vec3(x_pos, y_pos, 0.8900)
+    pose.p = gymapi.Vec3(x_pos, y_pos, 1.3)
     pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
     actor_name = asset_file.replace(".xml", "")
