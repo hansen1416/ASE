@@ -176,13 +176,21 @@ for i in range(num_actors):
 
     # Set rigid shape properties (collision filters)
     rigid_props = gym.get_actor_rigid_shape_properties(env, actor_handle)
+
+    # SELF_MASK = 1  # any nonzero bit
+    # for sp in rigid_props:
+    #     sp.filter = SELF_MASK
+
+    # gym.set_actor_rigid_shape_properties(env, actor_handle, rigid_props)
+    
+    # if num_rb == len(filter_ints):
+    #     for p_idx in range(num_rb):
+    #         rigid_props[p_idx].filter = filter_ints[p_idx]
+    #     gym.set_actor_rigid_shape_properties(env, actor_handle, rigid_props)
+    # else:
+    #     print(f"Warning: Rigid body count mismatch ({num_rb} vs {len(filter_ints)}) for {asset_file}. Skipping filter setting.")
+
     num_rb = len(rigid_props)
-    if num_rb == len(filter_ints):
-        for p_idx in range(num_rb):
-            rigid_props[p_idx].filter = filter_ints[p_idx]
-        gym.set_actor_rigid_shape_properties(env, actor_handle, rigid_props)
-    else:
-        print(f"Warning: Rigid body count mismatch ({num_rb} vs {len(filter_ints)}) for {asset_file}. Skipping filter setting.")
 
     # Initialize collision visualization to green
     for rb_idx in range(num_rb):
