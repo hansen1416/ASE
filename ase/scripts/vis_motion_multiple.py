@@ -35,10 +35,19 @@ from poselib.poselib.skeleton.skeleton3d import SkeletonTree
 from easydict import EasyDict
 from utils.motion_lib_base import FixHeightMode
 
+custom_parameters = [
+    {
+        "name": "--exclude_faulty",
+        "action": "store_true",
+        "dest": "exclude_faulty",
+        "default": False,
+        "help": "Include faulty humanoids (disable default exclusion).",
+    },
+]
 
 # parse arguments
 args = gymutil.parse_arguments(description="Joint monkey: Animate collision box",
-                               custom_parameters=[])
+                               custom_parameters=custom_parameters,)
 
 
 # initialize gym
@@ -87,9 +96,10 @@ if not asset_file_list:
     print("*** No SMPL assets found in", asset_root)
     quit()
 
-exclude_set= [os.path.join(asset_root,"aaab922b_smpl.xml"), os.path.join(asset_root,"6803e1fa_smpl.xml")]
+if args.exclude_faulty:
+    exclude_set = [os.path.join(asset_root,"aaab922b_smpl.xml"), os.path.join(asset_root,"6803e1fa_smpl.xml")]
 
-asset_file_list = [s for s in asset_file_list if s not in exclude_set]
+    asset_file_list = [s for s in asset_file_list if s not in exclude_set]
 
 print("Found", len(asset_file_list), "SMPL assets")
 
@@ -157,9 +167,12 @@ for i in range(num_actors):
     gym.set_actor_dof_states(env, actor_handle, dof_states, gymapi.STATE_ALL)
 
     # Set DOF drive mode to position control
-    props = gym.get_actor_dof_properties(env, actor_handle)
-    props["driveMode"].fill(gymapi.DOF_MODE_POS)
-    gym.set_actor_dof_properties(env, actor_handle, props)
+    dof_props = gym.get_actor_dof_properties(env, actor_handle)
+    dof_props["driveMode"].fill(gymapi.DOF_MODE_POS)
+    # dof_props["stiffness"].fill(0.0)
+    # dof_props["damping"].fill(0.0)
+
+    gym.set_actor_dof_properties(env, actor_handle, dof_props)
 
     # Set rigid shape properties (collision filters)
     rigid_props = gym.get_actor_rigid_shape_properties(env, actor_handle)
