@@ -10,7 +10,6 @@ xml_paths = [
     os.path.join(project_dir, "data/assets/mjcf/smpl/638a4fb7_smpl.xml"),
     os.path.join(project_dir, "data/assets/mjcf/smpl/0a1ece18_smpl.xml"),
     os.path.join(project_dir, "data/assets/mjcf/smpl/75e01b05_smpl.xml"),
-    
 ]
 
 for xml_path in xml_paths:
