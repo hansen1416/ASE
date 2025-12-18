@@ -5,6 +5,11 @@ ase/data/motions/amp_humanoid_walk.npy
 tensor([ 7,  3, 22, 17], device='cuda:0')
 """
 
+import sys
+import os
+
+sys.path.append(os.getcwd())
+
 from enum import Enum
 import numpy as np
 
@@ -17,8 +22,11 @@ from env.tasks.humanoid import Humanoid, dof_to_obs
 from utils import gym_util
 from utils.motion_lib import MotionLib
 
+project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 device = 'cuda:0'
-motion_file = "ase/data/motions/amp_humanoid_walk.npy"
+motion_file = os.path.join(project_dir, "data/motions/amp_humanoid_walk.npy")
+
 _dof_body_ids = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14]
 _dof_offsets = [0, 3, 6, 9, 10, 13, 14, 17, 18, 21, 24, 25, 28]
 _key_body_ids = torch.tensor([ 5,  8, 11, 14], device=device)

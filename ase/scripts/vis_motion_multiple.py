@@ -77,7 +77,9 @@ if viewer is None:
     print("*** Failed to create viewer")
     quit()
 
-asset_root = os.path.join("ase", "data", "assets", "mjcf", "smpl")
+project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+asset_root = os.path.join(project_dir, "data", "assets", "mjcf", "smpl")
 
 # Find all SMPL assets
 asset_file_list = sorted(glob.glob(os.path.join(asset_root, "*_smpl.xml")))

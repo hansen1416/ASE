@@ -1,9 +1,12 @@
+import os
 import mujoco
 
-xml_path = "ase/data/assets/mjcf/smpl/aaab922b_smpl.xml"   # your two faulty ones
-# xml_path = "ase/data/assets/mjcf/smpl/6803e1fa_smpl.xml"   # your two faulty ones
+project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# xml_path = "ase/data/assets/mjcf/smpl/75e01b05_smpl.xml"
+xml_path = os.path.join(project_dir, "data/assets/mjcf/smpl/aaab922b_smpl.xml")   # your two faulty ones
+# xml_path = os.path.join(project_dir, "data/assets/mjcf/smpl/6803e1fa_smpl.xml")   # your two faulty ones
+
+# xml_path = os.path.join(project_dir, "data/assets/mjcf/smpl/75e01b05_smpl.xml")
 
 m = mujoco.MjModel.from_xml_path(xml_path)
 d = mujoco.MjData(m)

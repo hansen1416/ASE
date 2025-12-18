@@ -1,3 +1,5 @@
+import os
+
 import xml.etree.ElementTree as ET
 import numpy as np
 
@@ -16,12 +18,13 @@ def capsule_bad(geom):
     L = np.linalg.norm(b - a)
     return (L < 1e-4) or (r > 0.49 * L), "heuristic problem"  # heuristic
 
+project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-xml_path = "ase/data/assets/mjcf/smpl/aaab922b_smpl.xml"   # your two faulty ones
-xml_path = "ase/data/assets/mjcf/smpl/6803e1fa_smpl.xml"   # your two faulty ones
+xml_path = os.path.join(project_dir, "data/assets/mjcf/smpl/aaab922b_smpl.xml")   # your two faulty ones
+xml_path = os.path.join(project_dir, "data/assets/mjcf/smpl/6803e1fa_smpl.xml")   # your two faulty ones
 
-xml_path = "ase/data/assets/mjcf/smpl/75e01b05_smpl.xml"
-xml_path = "ase/data/assets/mjcf/smpl/0e091a72_smpl.xml"
+xml_path = os.path.join(project_dir, "data/assets/mjcf/smpl/75e01b05_smpl.xml")
+xml_path = os.path.join(project_dir, "data/assets/mjcf/smpl/0e091a72_smpl.xml")
 
 
 tree = ET.parse(xml_path)

@@ -35,7 +35,6 @@ from poselib.poselib.skeleton.skeleton3d import SkeletonTree
 from easydict import EasyDict
 from utils.motion_lib_base import FixHeightMode
 
-
 # parse arguments
 args = gymutil.parse_arguments(description="Joint monkey: Animate collision box",
                                custom_parameters=[])
@@ -78,7 +77,9 @@ if viewer is None:
     print("*** Failed to create viewer")
     quit()
 
-asset_root = os.path.join("ase", "data", "assets", "mjcf", "smpl")
+project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+asset_root = os.path.join(project_dir, "data", "assets", "mjcf", "smpl")
 
 asset_file = "aaab922b_smpl.xml"
 # asset_file = "6803e1fa_smpl.xml"
