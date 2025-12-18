@@ -109,7 +109,7 @@ env_lower = gymapi.Vec3(-spacing, spacing, 0)
 env_upper = gymapi.Vec3(spacing, spacing, spacing)
 
 # position the camera
-cam_pos = gymapi.Vec3(0, -5.0, 3)
+cam_pos = gymapi.Vec3(3.0, 0.0, 2)
 cam_target = gymapi.Vec3(0, 0, 0)
 gym.viewer_camera_look_at(viewer, None, cam_pos, cam_target)
 
