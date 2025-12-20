@@ -28,6 +28,11 @@ from learning import hrl_players
 from learning import hrl_models
 from learning import hrl_network_builder
 
+from learning import phc_agent
+from learning import phc_players
+from learning import phc_models
+from learning import phc_network_builder
+
 args = None
 cfg = None
 cfg_train = None
@@ -166,6 +171,11 @@ def build_alg_runner(algo_observer):
     runner.player_factory.register_builder('hrl', lambda **kwargs : hrl_players.HRLPlayer(**kwargs))
     runner.model_builder.model_factory.register_builder('hrl', lambda network, **kwargs : hrl_models.ModelHRLContinuous(network))  
     runner.model_builder.network_factory.register_builder('hrl', lambda **kwargs : hrl_network_builder.HRLBuilder())
+
+    runner.algo_factory.register_builder('phc', lambda **kwargs : phc_agent.PHCAgent(**kwargs))
+    runner.player_factory.register_builder('phc', lambda **kwargs : phc_players.PHCPlayerContinuous(**kwargs))
+    runner.model_builder.model_factory.register_builder('phc', lambda network, **kwargs : phc_models.ModelPHCContinuous(network))  
+    runner.model_builder.network_factory.register_builder('phc', lambda **kwargs : phc_network_builder.PHCBuilder())
     
     return runner
 
@@ -182,7 +192,7 @@ def main():
 
     if USER == "hlz":
 
-        num_actors = 32
+        num_actors = 64
 
         cfg['env']['numEnvs'] = num_actors
         cfg['env']['stateInit'] = 'Default'
