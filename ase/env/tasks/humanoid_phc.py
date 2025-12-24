@@ -4,12 +4,9 @@ import numpy as np
 import torch
 from easydict import EasyDict
 
-from isaacgym import gymapi
 from isaacgym import gymtorch
 
 from env.tasks.humanoid import Humanoid, dof_to_obs
-from utils import gym_util
-from utils.motion_lib import MotionLib
 from utils.motion_lib_smpl import MotionLibSMPL
 from isaacgym.torch_utils import *
 from poselib.poselib.skeleton.skeleton3d import SkeletonTree
@@ -42,6 +39,11 @@ class HumanoidPHC(Humanoid):
         motion_file = cfg['env']['motion_file']
         self._load_motion(motion_file)
 
+        # marker logic -------------
+        self._vis_motion_ids = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+        self._vis_motion_times = torch.zeros(self.num_envs, device=self.device, dtype=torch.float32)
+        # marker logic -------------
+
         self._amp_obs_buf = torch.zeros((self.num_envs, self._num_amp_obs_steps, self._num_amp_obs_per_step), device=self.device, dtype=torch.float)
         self._curr_amp_obs_buf = self._amp_obs_buf[:, 0]
         self._hist_amp_obs_buf = self._amp_obs_buf[:, 1:]
@@ -70,6 +72,12 @@ class HumanoidPHC(Humanoid):
 
         self.extras["amp_obs"] = amp_obs_flat
 
+        # marker logic -------------
+        if self._enable_target_markers and self.viewer is not None:
+            # advance the visual reference time by one sim step
+            self._vis_motion_times += self.dt
+            self._update_target_markers()
+        # marker logic -------------
         return
 
     def get_num_amp_obs(self):
@@ -249,6 +257,11 @@ class HumanoidPHC(Humanoid):
         else:
             assert(False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
 
+        # marker logic -------------
+        self._vis_motion_ids[env_ids] = motion_ids
+        self._vis_motion_times[env_ids] = motion_times
+        # marker logic -------------
+
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                = self._motion_lib.get_motion_state(motion_ids, motion_times)
         
@@ -271,6 +284,32 @@ class HumanoidPHC(Humanoid):
         self._reset_ref_motion_ids = motion_ids
         self._reset_ref_motion_times = motion_times
         return
+
+    # marker logic -------------
+    def _update_target_markers(self):
+
+        if not self._enable_target_markers:
+            return
+        if self.viewer is None:
+            return
+
+        # PHC-style: show "next" target (+dt) rather than current
+        query_t = self._vis_motion_times + self.dt
+
+        # MotionLibSMPL was configured with key_body_ids=self._key_body_ids, so key_pos matches keyBodies count/order
+        _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(self._vis_motion_ids, query_t)
+
+        # write into root-state view and push only marker actors
+        self._target_marker_pos[:] = key_pos
+
+        self.gym.set_actor_root_state_tensor_indexed(
+            self.sim,
+            gymtorch.unwrap_tensor(self._root_states),
+            gymtorch.unwrap_tensor(self._target_marker_actor_ids),
+            len(self._target_marker_actor_ids)
+        )
+
+    # marker logic -------------
 
     def _reset_hybrid_state_init(self, env_ids):
         num_envs = env_ids.shape[0]
