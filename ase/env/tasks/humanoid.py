@@ -216,21 +216,6 @@ class Humanoid(BaseTask):
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
         self._terminate_buf[env_ids] = 0
-
-        # marker logic -------------
-        # 2) reset marker root states (separate call)
-        if self._enable_target_markers:
-            marker_ids = self._target_marker_actor_ids.view(
-                self.num_envs, self._num_target_markers
-            )[env_ids].reshape(-1).contiguous()
-
-            self.gym.set_actor_root_state_tensor_indexed(
-                self.sim,
-                gymtorch.unwrap_tensor(self._root_states),
-                gymtorch.unwrap_tensor(marker_ids),
-                len(marker_ids),
-            )
-        # marker logic -------------
         
         return
 

@@ -1,4 +1,3 @@
-- reverse 1211 actions
-- try with safe humanoid
-- find out why the 12 humanoids are faulty
-- how to config PPO, bound_loss_type: "regularisation"? How to condition on the body shapes? So we can learn properly.
+- before each call, the corresponding rows in self._root_states for those actor indices already contain the desired reset states.   where we did this?
+
+- If that’s your case, the proper fix is to trigger reset when vis_motion_times >= motion_length (instead of waiting for max_episode_length). why is that, I think the max_episode is always gonna be the motion_length, did phc do this?

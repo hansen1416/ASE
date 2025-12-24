@@ -300,7 +300,7 @@ class HumanoidPHC(Humanoid):
         if not self._enable_target_markers or self.viewer is None:
             return
 
-        if env_ids is None:
+        if env_ids is None or len(env_ids) == 0:
             env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
 
         t = self._vis_motion_times[env_ids]
