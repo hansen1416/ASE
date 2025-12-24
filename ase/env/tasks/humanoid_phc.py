@@ -224,6 +224,16 @@ class HumanoidPHC(Humanoid):
         super()._reset_envs(env_ids)
         self._init_amp_obs(env_ids)
 
+        # marker logic -------------
+        if self._enable_target_markers:
+            # reset visual time for the envs that reset
+            self._vis_motion_times[env_ids] = 0.0
+
+            # optional: refresh marker immediately (so you see the jump on the same reset frame)
+            if self.viewer is not None:
+                self._update_target_markers(env_ids=env_ids, use_next_step=False)
+        # marker logic -------------
+
         return
 
     def _reset_actors(self, env_ids):
@@ -286,27 +296,28 @@ class HumanoidPHC(Humanoid):
         return
 
     # marker logic -------------
-    def _update_target_markers(self):
-
-        if not self._enable_target_markers:
-            return
-        if self.viewer is None:
+    def _update_target_markers(self, env_ids=None, use_next_step=True):
+        if not self._enable_target_markers or self.viewer is None:
             return
 
-        # PHC-style: show "next" target (+dt) rather than current
-        query_t = self._vis_motion_times + self.dt
+        if env_ids is None:
+            env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
 
-        # MotionLibSMPL was configured with key_body_ids=self._key_body_ids, so key_pos matches keyBodies count/order
-        _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(self._vis_motion_ids, query_t)
+        t = self._vis_motion_times[env_ids]
+        if use_next_step:
+            t = t + self.dt
 
-        # write into root-state view and push only marker actors
-        self._target_marker_pos[:] = key_pos
+        motion_ids = self._vis_motion_ids[env_ids]
+        _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(motion_ids, t)
 
+        self._target_marker_pos[env_ids] = key_pos
+
+        marker_ids = self._target_marker_actor_ids.view(self.num_envs, self._num_target_markers)[env_ids].reshape(-1)
         self.gym.set_actor_root_state_tensor_indexed(
             self.sim,
             gymtorch.unwrap_tensor(self._root_states),
-            gymtorch.unwrap_tensor(self._target_marker_actor_ids),
-            len(self._target_marker_actor_ids)
+            gymtorch.unwrap_tensor(marker_ids),
+            len(marker_ids),
         )
 
     # marker logic -------------
