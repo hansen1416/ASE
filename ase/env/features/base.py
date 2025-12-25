@@ -23,3 +23,6 @@ class Feature(ABC):
 
     def on_post_physics_step(self, task:HumanoidTask) -> None:
         pass
+
+    def on_render(self, task:HumanoidTask, sync_frame_time: bool=False) -> None:
+        pass

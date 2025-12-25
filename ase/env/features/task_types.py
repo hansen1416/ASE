@@ -19,6 +19,7 @@ class HumanoidTask(Protocol):
     # tensors used by features
     _root_states: torch.Tensor
     _humanoid_actor_ids: torch.Tensor
+    _humanoid_root_states: torch.Tensor
 
     # optional (only present in PHC / imitation tasks)
     _motion_lib: Any  # MotionLibSMPL-like

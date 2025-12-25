@@ -9,6 +9,7 @@ from isaacgym.torch_utils import *
 from utils import torch_utils
 from env.tasks.base_task import BaseTask
 from env.features.target_marker import TargetMarkerFeature
+from env.features.follow_camera import FollowCameraFeature
 
 SMPL_MUJOCO_NAMES = ['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 
                      'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Hand']
@@ -55,7 +56,7 @@ class Humanoid(BaseTask):
         self.cfg["headless"] = headless
 
         # fetures plugin -------------
-        self._features = [TargetMarkerFeature(enabled=True)]
+        self._features = [TargetMarkerFeature(enabled=True), FollowCameraFeature(enabled=True)]
         # fetures plugin -------------
          
         super().__init__(cfg=self.cfg)
@@ -129,9 +130,6 @@ class Humanoid(BaseTask):
         # also MotionLib is configured to output only those key bodies `self._key_body_ids`
         self._key_body_ids = self._build_key_body_ids_tensor(key_bodies)
         self._contact_body_ids = self._build_contact_body_ids_tensor(contact_bodies)
-        
-        if self.viewer != None:
-            self._init_camera()
 
         return
 
@@ -411,9 +409,6 @@ class Humanoid(BaseTask):
         beta_dim = self._template_betas.shape[1]
         # torch.Size([2, 10]) [number_actors, betas]
         self._betas_env = torch.zeros(self.num_envs, beta_dim, device=self.device)
-        # ---- debug: detect non-finite physics state ----
-        self._template_ids_env = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
-        # ---- debug: detect non-finite physics state ----
         # load beta into observation ===============
 
         # ---- 1211 actions new: morphology-aware root heights ---
@@ -434,9 +429,6 @@ class Humanoid(BaseTask):
             # assign beta for this env when smpl is used
             template_id = i % m
             self._betas_env[i] = self._template_betas[template_id]
-            # ---- debug: detect non-finite physics state ----
-            self._template_ids_env[i] = template_id
-            # ---- debug: detect non-finite physics state ----
             # load beta into observation ===============
 
             # ---- 1211 actions new: cache a safe spawn height for this env ---
@@ -447,18 +439,6 @@ class Humanoid(BaseTask):
             self._build_env(i, env_ptr, h_asset)
             # multi humanoid template change ===============
             self.envs.append(env_ptr)
-
-        # dof_prop = self.gym.get_actor_dof_properties(self.envs[0], self.humanoid_handles[0])
-        # for j in range(self.num_dof):
-        #     if dof_prop['lower'][j] > dof_prop['upper'][j]:
-        #         self.dof_limits_lower.append(dof_prop['upper'][j])
-        #         self.dof_limits_upper.append(dof_prop['lower'][j])
-        #     else:
-        #         self.dof_limits_lower.append(dof_prop['lower'][j])
-        #         self.dof_limits_upper.append(dof_prop['upper'][j])
-
-        # self.dof_limits_lower = to_torch(self.dof_limits_lower, device=self.device)
-        # self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self.device)
 
         # collect per-actor dof limits (lower, upper already corrected for swapped bounds)
         dof_lowers_all = []
@@ -508,94 +488,6 @@ class Humanoid(BaseTask):
         for f in self._features: f.on_humanoid_actor_created(self, env_id, env_ptr)
         # fetures plugin -------------
 
-        # # ---- 1211 actions debug the template ---
-        # body_props = self.gym.get_actor_rigid_body_properties(env_ptr, humanoid_handle)
-
-        # masses = [bp.mass for bp in body_props]
-        # inertia_eigs = []
-        # for bp in body_props:
-        #     I = mat33_to_np(bp.inertia).reshape(3, 3)   # inertia is 3×3, row-major
-        #     eigs = np.linalg.eigvals(I)
-        #     inertia_eigs.append(eigs)
-
-        # ASYM_TOL      = 1e-5   # how non-symmetric is allowed
-        # EIG_MIN_TOL   = 1e-6   # min allowed eigenvalue (after symmetrisation)
-        # EIG_IMAG_TOL  = 1e-6   # max allowed imaginary part
-
-        # for i, bp in enumerate(body_props):
-        #     I = mat33_to_np(bp.inertia).reshape(3, 3)
-
-        #     # symmetry check
-        #     asym_norm = np.linalg.norm(I - I.T)
-
-        #     # eigenvalues of raw I (may be complex)
-        #     eigs = np.linalg.eigvals(I)
-        #     real = eigs.real
-        #     imag = eigs.imag
-
-        #     # also check eigenvalues of a symmetrised inertia (physically what we want)
-        #     I_sym = 0.5 * (I + I.T)
-        #     eigs_sym = np.linalg.eigvalsh(I_sym)  # real by construction
-
-        #     bad_asym = asym_norm > ASYM_TOL
-        #     bad_imag = np.max(np.abs(imag)) > EIG_IMAG_TOL
-        #     bad_real = np.min(eigs_sym) < EIG_MIN_TOL   # near-zero or negative
-
-        #     if bad_asym or bad_imag or bad_real:
-        #         print(f"[WARN] env {env_id} body {i}")
-        #         print("I =\n", I)
-        #         print("asym_norm:", asym_norm)
-        #         print("eigs (raw):", eigs)
-        #         print("eigs (sym):", eigs_sym)
-
-        # min_mass   = float(np.min(masses))
-        # max_mass   = float(np.max(masses))
-        # total_mass = float(np.sum(masses))
-        # min_I_eig  = float(np.min([e.min() for e in inertia_eigs]))
-        
-        # # print("mass min/max/total:", min_mass, max_mass, total_mass)
-        # # print("inertia eigen min:", min_I_eig)
-
-        # # ---- Heuristic thresholds (for human-scale characters) ----
-        # MIN_SAFE_MASS          = 0.02      # kg, per-link minimum
-        # MAX_SAFE_MASS_RATIO    = 200.0     # max_mass / min_mass
-        # MIN_SAFE_TOTAL_MASS    = 20.0      # kg
-        # MAX_SAFE_TOTAL_MASS    = 120.0     # kg
-        # MIN_SAFE_INERTIA_EIG   = 1e-5      # kg·m^2
-
-        # messages = []
-
-        # # Mass checks
-        # if min_mass < MIN_SAFE_MASS:
-        #     messages.append(f"[WARN] min mass too small: {min_mass:.4f} kg (threshold {MIN_SAFE_MASS} kg)")
-
-        # mass_ratio = max_mass / min_mass if min_mass > 0 else float("inf")
-        # if mass_ratio > MAX_SAFE_MASS_RATIO:
-        #     messages.append(f"[WARN] mass ratio too large: {mass_ratio:.1f} (threshold {MAX_SAFE_MASS_RATIO})")
-
-        # if not (MIN_SAFE_TOTAL_MASS <= total_mass <= MAX_SAFE_TOTAL_MASS):
-        #     messages.append(
-        #         f"[WARN] total mass {total_mass:.2f} kg outside [{MIN_SAFE_TOTAL_MASS}, {MAX_SAFE_TOTAL_MASS}] kg"
-        #     )
-
-        # # Inertia checks
-        # if min_I_eig < MIN_SAFE_INERTIA_EIG:
-        #     messages.append(
-        #         f"[WARN] minimum inertia eigenvalue too small: {min_I_eig:.3e} "
-        #         f"(threshold {MIN_SAFE_INERTIA_EIG:.1e})"
-        #     )
-
-        # # Print summary
-        # if messages:
-        #     print(f"{env_id}: env_id")
-        #     print("=== PHYSICAL PROPERTY CHECK: POTENTIAL ISSUES DETECTED ===!!!!!!!!!!!!")
-        #     for msg in messages:
-        #         print(msg)
-        # else:
-        #     # print("=== PHYSICAL PROPERTY CHECK: within conservative safety thresholds ===")
-        #     pass
-        # # ---- 1211 actions debug the template ---
-
         self.gym.enable_actor_dof_force_sensors(env_ptr, humanoid_handle)
 
         for j in range(self.num_bodies):
@@ -634,7 +526,6 @@ class Humanoid(BaseTask):
                 
                 #lim_low[dof_offset:(dof_offset + dof_size)] = -np.pi
                 #lim_high[dof_offset:(dof_offset + dof_size)] = np.pi
-
 
             elif (dof_size == 1):
                 curr_low = lim_low[dof_offset]
@@ -745,56 +636,21 @@ class Humanoid(BaseTask):
 
         self._refresh_sim_tensors()
 
-        # ---- debug: detect non-finite physics state ----
-        bad_pos  = ~torch.isfinite(self._rigid_body_pos).all(dim=(1, 2))
-        bad_rot  = ~torch.isfinite(self._rigid_body_rot).all(dim=(1, 2))
-        bad_vel  = ~torch.isfinite(self._rigid_body_vel).all(dim=(1, 2))
-        bad_ang  = ~torch.isfinite(self._rigid_body_ang_vel).all(dim=(1, 2))
-        bad_envs = bad_pos | bad_rot | bad_vel | bad_ang
-
-        if bad_envs.any():
-            bad_ids = bad_envs.nonzero(as_tuple=False).flatten()
-            print("[DEBUG] non-finite physics in envs:", bad_ids.tolist())
-
-            # if you stored template ids, report them:
-            if hasattr(self, "_template_ids_env"):
-                tmpl_ids = self._template_ids_env[bad_ids].tolist()
-                print("[DEBUG] template indices:", tmpl_ids)
-                asset_files = self.cfg["env"]["asset"]["assetFileName"]
-                for e, t in zip(bad_ids.tolist(), tmpl_ids):
-                    print(f"[DEBUG] env {e} uses asset {asset_files[t]}")
-
-            self.reset_buf[bad_ids] = 1
-
-            # 1) reset physics state
-            self.reset(env_ids=bad_ids)
-
-            # 2) re-sync sim tensors after reset
-            self._refresh_sim_tensors()
-
-            # # 3) rebuild observations for the reset envs
-            # self._compute_observations(env_ids=bad_ids)
-
-            # 3) if AMP history exists, wipe it for those envs
-            if hasattr(self, "_amp_obs_buf"):
-                self._amp_obs_buf[bad_ids] = 0.0
-        # -----------------------------------------------
-
         self._compute_observations()
         self._compute_reward(self.actions)
         self._compute_reset()
         
         self.extras["terminate"] = self._terminate_buf
 
-        # debug viz
-        if self.viewer and self.debug_viz:
-            self._update_debug_viz()
-
         return
 
     def render(self, sync_frame_time=False):
-        if self.viewer:
-            self._update_camera()
+        # if self.viewer:
+        #     self._update_camera()
+
+        # fetures plugin -------------
+        for f in self._features: f.on_render(self)
+        # fetures plugin -------------
 
         super().render(sync_frame_time)
         return
@@ -828,43 +684,6 @@ class Humanoid(BaseTask):
     def _action_to_pd_targets(self, action):
         pd_tar = self._pd_action_offset + self._pd_action_scale * action
         return pd_tar
-
-    def _init_camera(self):
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        self._cam_prev_char_pos = self._humanoid_root_states[0, 0:3].cpu().numpy()
-        
-        cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0] - 1.0, 
-                              self._cam_prev_char_pos[1] - 6.0, 
-                              2.0)
-        cam_target = gymapi.Vec3(self._cam_prev_char_pos[0],
-                                 self._cam_prev_char_pos[1],
-                                 1.0)
-
-        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
-        return
-
-    def _update_camera(self):
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        char_root_pos = self._humanoid_root_states[0, 0:3].cpu().numpy()
-        
-        cam_trans = self.gym.get_viewer_camera_transform(self.viewer, None)
-        cam_pos = np.array([cam_trans.p.x, cam_trans.p.y, cam_trans.p.z])
-        cam_delta = cam_pos - self._cam_prev_char_pos
-
-        new_cam_target = gymapi.Vec3(char_root_pos[0], char_root_pos[1], 1.0)
-        new_cam_pos = gymapi.Vec3(char_root_pos[0] + cam_delta[0], 
-                                  char_root_pos[1] + cam_delta[1], 
-                                  cam_pos[2])
-
-        self.gym.viewer_camera_look_at(self.viewer, None, new_cam_pos, new_cam_target)
-
-        self._cam_prev_char_pos[:] = char_root_pos
-        return
-
-    def _update_debug_viz(self):
-        self.gym.clear_lines(self.viewer)
-        return
-    
 
 #####################################################################
 ###=========================jit functions=========================###
