@@ -10,3 +10,5 @@
 - what is the purpose of `def fetch_amp_obs_demo(self, num_samples)` in humanoid_phc.py
 
 - define an abstract task, so we can type hint in features plugins.
+
+- todo we need do calculate the safe height more percisely, findout the exact height for each humanoid

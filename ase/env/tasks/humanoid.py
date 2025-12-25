@@ -440,6 +440,7 @@ class Humanoid(BaseTask):
             # load beta into observation ===============
 
             # ---- 1211 actions new: cache a safe spawn height for this env ---
+            # todo we need do this more percisely, findout the exact height for each humanoid
             self._safe_root_heights[i] = self._compute_safe_root_height(template_id)
             # ---------------------------------------------------
 
@@ -495,7 +496,6 @@ class Humanoid(BaseTask):
         # char_h = 0.89
 
         # ---- 1211 morphology-aware spawn height ---
-        # todo we need do this more percisely, findout the exact height for each humanoid
         char_h = float(self._safe_root_heights[env_id]) + 0.1
         # --------------------------------------
 
