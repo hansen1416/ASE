@@ -102,7 +102,7 @@ class TargetMarkerFeature(Feature):
 
         self._ensure_vis_buffers(task)
 
-        num_actors = task.get_num_actors_per_env()
+        num_actors = task._root_states.shape[0] // task.num_envs
         root_view = task._root_states.view(task.num_envs, num_actors, task._root_states.shape[-1])
 
         # markers are actors 1..K
