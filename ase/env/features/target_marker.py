@@ -96,7 +96,6 @@ class TargetMarkerFeature(Feature):
             self._marker_handles_np[env_id, k] = int(h)
         
 
-
     def on_post_init_tensors(self, task) -> None:
         if not self.enabled:
             return
@@ -132,6 +131,7 @@ class TargetMarkerFeature(Feature):
         if not self.enabled:
             return
         self._ensure_vis_buffers(task)
+        # reset visual time for the envs that reset
         self._vis_motion_times[env_ids] = 0.0
 
         if self._show_only_with_viewer and task.viewer is None:

@@ -9,7 +9,6 @@ env:
   pdControl: True
   powerScale: 1.0
   controlFrequencyInv: 2 # 30 Hz
-  stateInit: "Hybrid"
   hybridInitProb: 0.5
   numAMPObsSteps: 10
 

@@ -195,7 +195,6 @@ def main():
         num_actors = 1
 
         cfg['env']['numEnvs'] = num_actors
-        cfg['env']['stateInit'] = 'Default'
         cfg_train['params']['config']['horizon_length'] = 4
         cfg_train['params']['config']['minibatch_size'] = 4
         cfg_train['params']['config']['amp_batch_size'] = 1

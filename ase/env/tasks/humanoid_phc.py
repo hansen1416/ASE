@@ -13,15 +13,9 @@ from poselib.poselib.skeleton.skeleton3d import SkeletonTree
 from utils import torch_utils
 
 class HumanoidPHC(Humanoid):
-    class StateInit(Enum):
-        Default = 0
-        Start = 1
-        Random = 2
-        Hybrid = 3
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
-        state_init = cfg["env"]["stateInit"]
-        self._state_init = HumanoidPHC.StateInit[state_init]
+
         self._hybrid_init_prob = cfg["env"]["hybridInitProb"]
         self._num_amp_obs_steps = cfg["env"]["numAMPObsSteps"]
         assert(self._num_amp_obs_steps >= 2)
@@ -38,11 +32,6 @@ class HumanoidPHC(Humanoid):
 
         motion_file = cfg['env']['motion_file']
         self._load_motion(motion_file)
-
-        # marker logic -------------
-        # self._vis_motion_ids = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
-        # self._vis_motion_times = torch.zeros(self.num_envs, device=self.device, dtype=torch.float32)
-        # marker logic -------------
 
         self._amp_obs_buf = torch.zeros((self.num_envs, self._num_amp_obs_steps, self._num_amp_obs_per_step), device=self.device, dtype=torch.float)
         self._curr_amp_obs_buf = self._amp_obs_buf[:, 0]
@@ -76,12 +65,6 @@ class HumanoidPHC(Humanoid):
         for f in self._features: f.on_post_physics_step(self)
         # fetures plugin -------------
 
-        # marker logic -------------
-        # if self._enable_target_markers and self.viewer is not None:
-        #     # advance the visual reference time by one sim step
-        #     self._vis_motion_times += self.dt
-        #     self._update_target_markers()
-        # # marker logic -------------
         return
 
     def get_num_amp_obs(self):
@@ -232,16 +215,6 @@ class HumanoidPHC(Humanoid):
         for f in self._features: f.on_reset_envs(self, env_ids)
         # fetures plugin -------------
 
-        # marker logic -------------
-        # if self._enable_target_markers:
-        #     # reset visual time for the envs that reset
-        #     self._vis_motion_times[env_ids] = 0.0
-
-        #     # optional: refresh marker immediately (so you see the jump on the same reset frame)
-        #     if self.viewer is not None:
-        #         self._update_target_markers(env_ids=env_ids, use_next_step=False)
-        # marker logic -------------
-
         return
 
     def _reset_actors(self, env_ids):
@@ -250,11 +223,6 @@ class HumanoidPHC(Humanoid):
         
         motion_ids = self._motion_lib.sample_motions(num_envs)
         motion_times = torch.zeros(num_envs, device=self.device)
-
-        # marker logic -------------
-        # self._vis_motion_ids[env_ids] = motion_ids
-        # self._vis_motion_times[env_ids] = motion_times
-        # # marker logic -------------
 
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                = self._motion_lib.get_motion_state(motion_ids, motion_times)
@@ -278,33 +246,6 @@ class HumanoidPHC(Humanoid):
         self._reset_ref_motion_ids = motion_ids
         self._reset_ref_motion_times = motion_times
         return
-
-    # marker logic -------------
-    # def _update_target_markers(self, env_ids=None, use_next_step=True):
-    #     if not self._enable_target_markers or self.viewer is None:
-    #         return
-
-    #     if env_ids is None or len(env_ids) == 0:
-    #         env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
-
-    #     t = self._vis_motion_times[env_ids]
-    #     if use_next_step:
-    #         t = t + self.dt
-
-    #     motion_ids = self._vis_motion_ids[env_ids]
-    #     _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(motion_ids, t)
-
-    #     self._target_marker_pos[env_ids] = key_pos
-
-    #     marker_ids = self._target_marker_actor_ids.view(self.num_envs, self._num_target_markers)[env_ids].reshape(-1)
-    #     self.gym.set_actor_root_state_tensor_indexed(
-    #         self.sim,
-    #         gymtorch.unwrap_tensor(self._root_states),
-    #         gymtorch.unwrap_tensor(marker_ids),
-    #         len(marker_ids),
-    #     )
-
-    # marker logic -------------
 
     def _init_amp_obs(self, env_ids):
         self._compute_amp_observations(env_ids)
