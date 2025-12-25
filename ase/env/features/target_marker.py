@@ -7,6 +7,7 @@ from isaacgym import gymapi, gymtorch
 from isaacgym.torch_utils import to_torch
 
 from env.features.base import Feature
+from env.features.task_types import HumanoidTask
 
 
 class TargetMarkerFeature(Feature):
@@ -45,7 +46,7 @@ class TargetMarkerFeature(Feature):
 
 
     # ---- internals ----
-    def _ensure_vis_buffers(self, task, env_ids = None) -> None:
+    def _ensure_vis_buffers(self, task:HumanoidTask, env_ids = None) -> None:
         if self._vis_motion_ids is None or self._vis_motion_times is None:
             self._vis_motion_ids = torch.zeros(task.num_envs, device=task.device, dtype=torch.long)
             self._vis_motion_times = torch.zeros(task.num_envs, device=task.device, dtype=torch.float32)
@@ -58,7 +59,7 @@ class TargetMarkerFeature(Feature):
             self._vis_motion_times[env_ids] = self._reset_ref_motion_times
 
     # ---- hooks ----
-    def on_create_envs(self, task, num_envs: int) -> None:
+    def on_create_envs(self, task:HumanoidTask, num_envs: int) -> None:
         if not self.enabled:
             return
 
@@ -73,7 +74,7 @@ class TargetMarkerFeature(Feature):
         opts.linear_damping = 0.0
         self._marker_asset = task.gym.load_asset(task.sim, asset_root, self._asset_relpath, opts)
 
-    def on_humanoid_actor_created(self, task, env_id: int, env_ptr) -> None:
+    def on_humanoid_actor_created(self, task:HumanoidTask, env_id: int, env_ptr) -> None:
         if not self.enabled:
             return
 
@@ -96,7 +97,7 @@ class TargetMarkerFeature(Feature):
             self._marker_handles_np[env_id, k] = int(h)
         
 
-    def on_post_init_tensors(self, task) -> None:
+    def on_post_init_tensors(self, task:HumanoidTask) -> None:
         if not self.enabled:
             return
 
@@ -127,7 +128,7 @@ class TargetMarkerFeature(Feature):
         
 
 
-    def on_reset_envs(self, task, env_ids) -> None:
+    def on_reset_envs(self, task:HumanoidTask, env_ids) -> None:
         if not self.enabled:
             return
         self._ensure_vis_buffers(task)
@@ -140,7 +141,7 @@ class TargetMarkerFeature(Feature):
         self._update_markers(task, env_ids=env_ids, use_next_step=False)
         
 
-    def on_post_physics_step(self, task) -> None:
+    def on_post_physics_step(self, task:HumanoidTask) -> None:
         if not self.enabled:
             return
         if self._show_only_with_viewer and task.viewer is None:
@@ -150,7 +151,7 @@ class TargetMarkerFeature(Feature):
         self._update_markers(task, env_ids=None, use_next_step=True)
         
 
-    def _update_markers(self, task, env_ids=None, use_next_step: bool = True) -> None:
+    def _update_markers(self, task:HumanoidTask, env_ids=None, use_next_step: bool = True) -> None:
         # needs MotionLib (HumanoidPHC provides task._motion_lib)
         motion_lib = getattr(task, "_motion_lib", None)
         if motion_lib is None or self._marker_pos is None:
