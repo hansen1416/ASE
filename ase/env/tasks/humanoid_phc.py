@@ -40,8 +40,8 @@ class HumanoidPHC(Humanoid):
         self._load_motion(motion_file)
 
         # marker logic -------------
-        self._vis_motion_ids = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
-        self._vis_motion_times = torch.zeros(self.num_envs, device=self.device, dtype=torch.float32)
+        # self._vis_motion_ids = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+        # self._vis_motion_times = torch.zeros(self.num_envs, device=self.device, dtype=torch.float32)
         # marker logic -------------
 
         self._amp_obs_buf = torch.zeros((self.num_envs, self._num_amp_obs_steps, self._num_amp_obs_per_step), device=self.device, dtype=torch.float)
@@ -72,12 +72,16 @@ class HumanoidPHC(Humanoid):
 
         self.extras["amp_obs"] = amp_obs_flat
 
+        # fetures plugin -------------
+        for f in self._features: f.on_post_physics_step(self)
+        # fetures plugin -------------
+
         # marker logic -------------
-        if self._enable_target_markers and self.viewer is not None:
-            # advance the visual reference time by one sim step
-            self._vis_motion_times += self.dt
-            self._update_target_markers()
-        # marker logic -------------
+        # if self._enable_target_markers and self.viewer is not None:
+        #     # advance the visual reference time by one sim step
+        #     self._vis_motion_times += self.dt
+        #     self._update_target_markers()
+        # # marker logic -------------
         return
 
     def get_num_amp_obs(self):
@@ -224,53 +228,33 @@ class HumanoidPHC(Humanoid):
         super()._reset_envs(env_ids)
         self._init_amp_obs(env_ids)
 
-        # marker logic -------------
-        if self._enable_target_markers:
-            # reset visual time for the envs that reset
-            self._vis_motion_times[env_ids] = 0.0
+        # fetures plugin -------------
+        for f in self._features: f.on_reset_envs(self, env_ids)
+        # fetures plugin -------------
 
-            # optional: refresh marker immediately (so you see the jump on the same reset frame)
-            if self.viewer is not None:
-                self._update_target_markers(env_ids=env_ids, use_next_step=False)
+        # marker logic -------------
+        # if self._enable_target_markers:
+        #     # reset visual time for the envs that reset
+        #     self._vis_motion_times[env_ids] = 0.0
+
+        #     # optional: refresh marker immediately (so you see the jump on the same reset frame)
+        #     if self.viewer is not None:
+        #         self._update_target_markers(env_ids=env_ids, use_next_step=False)
         # marker logic -------------
 
         return
 
     def _reset_actors(self, env_ids):
-        if (self._state_init == HumanoidPHC.StateInit.Default):
-            self._reset_default(env_ids)
-        elif (self._state_init == HumanoidPHC.StateInit.Start
-              or self._state_init == HumanoidPHC.StateInit.Random):
-            self._reset_ref_state_init(env_ids)
-        elif (self._state_init == HumanoidPHC.StateInit.Hybrid):
-            self._reset_hybrid_state_init(env_ids)
-        else:
-            assert(False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
-        return
-    
-    def _reset_default(self, env_ids):
-        self._humanoid_root_states[env_ids] = self._initial_humanoid_root_states[env_ids]
-        self._dof_pos[env_ids] = self._initial_dof_pos[env_ids]
-        self._dof_vel[env_ids] = self._initial_dof_vel[env_ids]
-        self._reset_default_env_ids = env_ids
-        return
 
-    def _reset_ref_state_init(self, env_ids):
         num_envs = env_ids.shape[0]
-        motion_ids = self._motion_lib.sample_motions(num_envs)
         
-        if (self._state_init == HumanoidPHC.StateInit.Random
-            or self._state_init == HumanoidPHC.StateInit.Hybrid):
-            motion_times = self._motion_lib.sample_time(motion_ids)
-        elif (self._state_init == HumanoidPHC.StateInit.Start):
-            motion_times = torch.zeros(num_envs, device=self.device)
-        else:
-            assert(False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
+        motion_ids = self._motion_lib.sample_motions(num_envs)
+        motion_times = torch.zeros(num_envs, device=self.device)
 
         # marker logic -------------
-        self._vis_motion_ids[env_ids] = motion_ids
-        self._vis_motion_times[env_ids] = motion_times
-        # marker logic -------------
+        # self._vis_motion_ids[env_ids] = motion_ids
+        # self._vis_motion_times[env_ids] = motion_times
+        # # marker logic -------------
 
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                = self._motion_lib.get_motion_state(motion_ids, motion_times)
@@ -296,46 +280,31 @@ class HumanoidPHC(Humanoid):
         return
 
     # marker logic -------------
-    def _update_target_markers(self, env_ids=None, use_next_step=True):
-        if not self._enable_target_markers or self.viewer is None:
-            return
+    # def _update_target_markers(self, env_ids=None, use_next_step=True):
+    #     if not self._enable_target_markers or self.viewer is None:
+    #         return
 
-        if env_ids is None or len(env_ids) == 0:
-            env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
+    #     if env_ids is None or len(env_ids) == 0:
+    #         env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
 
-        t = self._vis_motion_times[env_ids]
-        if use_next_step:
-            t = t + self.dt
+    #     t = self._vis_motion_times[env_ids]
+    #     if use_next_step:
+    #         t = t + self.dt
 
-        motion_ids = self._vis_motion_ids[env_ids]
-        _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(motion_ids, t)
+    #     motion_ids = self._vis_motion_ids[env_ids]
+    #     _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(motion_ids, t)
 
-        self._target_marker_pos[env_ids] = key_pos
+    #     self._target_marker_pos[env_ids] = key_pos
 
-        marker_ids = self._target_marker_actor_ids.view(self.num_envs, self._num_target_markers)[env_ids].reshape(-1)
-        self.gym.set_actor_root_state_tensor_indexed(
-            self.sim,
-            gymtorch.unwrap_tensor(self._root_states),
-            gymtorch.unwrap_tensor(marker_ids),
-            len(marker_ids),
-        )
+    #     marker_ids = self._target_marker_actor_ids.view(self.num_envs, self._num_target_markers)[env_ids].reshape(-1)
+    #     self.gym.set_actor_root_state_tensor_indexed(
+    #         self.sim,
+    #         gymtorch.unwrap_tensor(self._root_states),
+    #         gymtorch.unwrap_tensor(marker_ids),
+    #         len(marker_ids),
+    #     )
 
     # marker logic -------------
-
-    def _reset_hybrid_state_init(self, env_ids):
-        num_envs = env_ids.shape[0]
-        ref_probs = to_torch(np.array([self._hybrid_init_prob] * num_envs), device=self.device)
-        ref_init_mask = torch.bernoulli(ref_probs) == 1.0
-
-        ref_reset_ids = env_ids[ref_init_mask]
-        if (len(ref_reset_ids) > 0):
-            self._reset_ref_state_init(ref_reset_ids)
-
-        default_reset_ids = env_ids[torch.logical_not(ref_init_mask)]
-        if (len(default_reset_ids) > 0):
-            self._reset_default(default_reset_ids)
-
-        return
 
     def _init_amp_obs(self, env_ids):
         self._compute_amp_observations(env_ids)

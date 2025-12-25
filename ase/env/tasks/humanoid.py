@@ -8,6 +8,7 @@ from isaacgym.torch_utils import *
 
 from utils import torch_utils
 from env.tasks.base_task import BaseTask
+from env.features.target_marker import TargetMarkerFeature
 
 SMPL_MUJOCO_NAMES = ['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 
                      'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Hand']
@@ -54,8 +55,12 @@ class Humanoid(BaseTask):
         self.cfg["headless"] = headless
         
         # marker logic -------------
-        self._enable_target_markers = True
+        # self._enable_target_markers = True
         # marker logic -------------
+
+        # fetures plugin -------------
+        self._features = [TargetMarkerFeature(enabled=True)]
+        # fetures plugin -------------
          
         super().__init__(cfg=self.cfg)
         
@@ -94,29 +99,33 @@ class Humanoid(BaseTask):
 
         self._humanoid_actor_ids = num_actors * torch.arange(self.num_envs, device=self.device, dtype=torch.int32)
         
+        # fetures plugin -------------
+        for f in self._features: f.on_post_init_tensors(self)
+        # fetures plugin -------------
+
         # marker logic -------------
-        if self._enable_target_markers:
-            root_view = self._root_states.view(self.num_envs, num_actors, self._root_states.shape[-1])
+        # if self._enable_target_markers:
+        #     root_view = self._root_states.view(self.num_envs, num_actors, self._root_states.shape[-1])
 
-            # Assumption (kept simple): humanoid is actor 0, markers are actors 1..K in each env
-            self._target_marker_states = root_view[:, 1:1 + self._num_target_markers, :]
-            self._target_marker_pos = self._target_marker_states[..., 0:3]
+        #     # Assumption (kept simple): humanoid is actor 0, markers are actors 1..K in each env
+        #     self._target_marker_states = root_view[:, 1:1 + self._num_target_markers, :]
+        #     self._target_marker_pos = self._target_marker_states[..., 0:3]
 
-            # hide initially
-            self._target_marker_pos[:] = 1000.0
-            self._target_marker_states[..., 3:7] = 0.0  # w component (x,y,z,w)
-            self._target_marker_states[..., 6] = 1.0
+        #     # hide initially
+        #     self._target_marker_pos[:] = 1000.0
+        #     self._target_marker_states[..., 3:7] = 0.0  # w component (x,y,z,w)
+        #     self._target_marker_states[..., 6] = 1.0
 
-            marker_local_ids = to_torch(self._target_marker_handles, device=self.device, dtype=torch.int32)
-            self._target_marker_actor_ids = (self._humanoid_actor_ids.unsqueeze(-1) + marker_local_ids).reshape(-1)
+        #     marker_local_ids = to_torch(self._target_marker_handles, device=self.device, dtype=torch.int32)
+        #     self._target_marker_actor_ids = (self._humanoid_actor_ids.unsqueeze(-1) + marker_local_ids).reshape(-1)
 
 
-            self.gym.set_actor_root_state_tensor_indexed(
-                self.sim,
-                gymtorch.unwrap_tensor(self._root_states),
-                gymtorch.unwrap_tensor(self._target_marker_actor_ids),
-                len(self._target_marker_actor_ids)
-            )
+        #     self.gym.set_actor_root_state_tensor_indexed(
+        #         self.sim,
+        #         gymtorch.unwrap_tensor(self._root_states),
+        #         gymtorch.unwrap_tensor(self._target_marker_actor_ids),
+        #         len(self._target_marker_actor_ids)
+        #     )
         # marker logic -------------
 
         # create some wrapper tensors for different slices
@@ -296,6 +305,10 @@ class Humanoid(BaseTask):
         return safe_h
 
     def _create_envs(self, num_envs, spacing, num_per_row):
+        # fetures plugin -------------
+        for f in self._features: f.on_create_envs(self, num_envs)
+        # fetures plugin -------------
+
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
 
@@ -308,11 +321,11 @@ class Humanoid(BaseTask):
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
         
         # marker logic -------------
-        if self._enable_target_markers:
+        # if self._enable_target_markers:
             
-            self._num_target_markers = len(self.cfg["env"]["keyBodies"])
-            self._target_marker_handles = np.zeros((num_envs, self._num_target_markers), dtype=np.int32)
-            self._load_target_marker_asset()
+        #     self._num_target_markers = len(self.cfg["env"]["keyBodies"])
+        #     self._target_marker_handles = np.zeros((num_envs, self._num_target_markers), dtype=np.int32)
+        #     self._load_target_marker_asset()
         # marker logic -------------
 
         # # ---- 1211 actions robust convex decomposition & inertia overrides ----
@@ -519,6 +532,7 @@ class Humanoid(BaseTask):
         # char_h = 0.89
 
         # ---- 1211 morphology-aware spawn height ---
+        # todo we need do this more percisely, findout the exact height for each humanoid
         char_h = float(self._safe_root_heights[env_id]) + 0.1
         # --------------------------------------
 
@@ -527,8 +541,12 @@ class Humanoid(BaseTask):
 
         humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", col_group, col_filter, segmentation_id)
 
+        # fetures plugin -------------
+        for f in self._features: f.on_humanoid_actor_created(self, env_id, env_ptr)
+        # fetures plugin -------------
+
         # marker logic -------------
-        self._build_target_markers(env_id, env_ptr)
+        # self._build_target_markers(env_id, env_ptr)
         # marker logic -------------
 
         # # ---- 1211 actions debug the template ---
@@ -889,38 +907,38 @@ class Humanoid(BaseTask):
         return
     
     # marker logic -------------
-    def _load_target_marker_asset(self):
+    # def _load_target_marker_asset(self):
 
-        asset_root = self.cfg["env"]["asset"]["assetRoot"]
-        # You can copy PHC's traj_marker.urdf into <asset_root>/urdf/traj_marker.urdf
-        marker_asset = "urdf/traj_marker.urdf"
+    #     asset_root = self.cfg["env"]["asset"]["assetRoot"]
+    #     # You can copy PHC's traj_marker.urdf into <asset_root>/urdf/traj_marker.urdf
+    #     marker_asset = "urdf/traj_marker.urdf"
 
-        opts = gymapi.AssetOptions()
-        opts.fix_base_link = True
-        opts.disable_gravity = True
-        opts.angular_damping = 0.0
-        opts.linear_damping = 0.0
+    #     opts = gymapi.AssetOptions()
+    #     opts.fix_base_link = True
+    #     opts.disable_gravity = True
+    #     opts.angular_damping = 0.0
+    #     opts.linear_damping = 0.0
 
-        self._target_marker_asset = self.gym.load_asset(self.sim, asset_root, marker_asset, opts)
+    #     self._target_marker_asset = self.gym.load_asset(self.sim, asset_root, marker_asset, opts)
 
-    def _build_target_markers(self, env_id: int, env_ptr):
-        # one marker per key body (keeps it cheap and matches MotionLib key_pos)
-        marker_pose = gymapi.Transform()
-        marker_pose.p = gymapi.Vec3(0.0, 0.0, 1000.0)  # start hidden
+    # def _build_target_markers(self, env_id: int, env_ptr):
+    #     # one marker per key body (keeps it cheap and matches MotionLib key_pos)
+    #     marker_pose = gymapi.Transform()
+    #     marker_pose.p = gymapi.Vec3(0.0, 0.0, 1000.0)  # start hidden
 
-        for k in range(self._num_target_markers):
-            h = self.gym.create_actor(
-                env_ptr,
-                self._target_marker_asset,
-                marker_pose,
-                f"target_marker_{k}",
-                env_id,            # col_group
-                0,                 # col_filter (usually safe for a visual-only URDF)
-                0
-            )
-            # red markers
-            self.gym.set_rigid_body_color(env_ptr, h, 0, gymapi.MESH_VISUAL, gymapi.Vec3(1.0, 0.0, 0.0))
-            self._target_marker_handles[env_id, k] = int(h)
+    #     for k in range(self._num_target_markers):
+    #         h = self.gym.create_actor(
+    #             env_ptr,
+    #             self._target_marker_asset,
+    #             marker_pose,
+    #             f"target_marker_{k}",
+    #             env_id,            # col_group
+    #             0,                 # col_filter (usually safe for a visual-only URDF)
+    #             0
+    #         )
+    #         # red markers
+    #         self.gym.set_rigid_body_color(env_ptr, h, 0, gymapi.MESH_VISUAL, gymapi.Vec3(1.0, 0.0, 0.0))
+    #         self._target_marker_handles[env_id, k] = int(h)
     # marker logic -------------
 
 #####################################################################
