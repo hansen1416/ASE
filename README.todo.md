@@ -12,3 +12,15 @@
 - define an abstract task, so we can type hint in features plugins.
 
 - todo we need do calculate the safe height more percisely, findout the exact height for each humanoid
+
+
+
+
+
+- load motion in multiple shapes
+
+
+- observation with motion target of a certain length, refer to PHC,
+
+
+- reward function like PHC
