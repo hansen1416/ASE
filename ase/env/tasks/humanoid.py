@@ -91,8 +91,6 @@ class Humanoid(BaseTask):
         # Because it is a view, in-place writes to self._humanoid_root_states[:, 0:3/3:7/…] 
         # directly modify the corresponding slice of self._root_states.
         self._humanoid_root_states = self._root_states.view(self.num_envs, num_actors, actor_root_state.shape[-1])[..., 0, :]
-        self._initial_humanoid_root_states = self._humanoid_root_states.clone()
-        self._initial_humanoid_root_states[:, 7:13] = 0
 
         self._humanoid_actor_ids = num_actors * torch.arange(self.num_envs, device=self.device, dtype=torch.int32)
         
@@ -105,10 +103,7 @@ class Humanoid(BaseTask):
         dofs_per_env = self._dof_state.shape[0] // self.num_envs
         self._dof_pos = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., :self.num_dof, 0]
         self._dof_vel = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., :self.num_dof, 1]
-        
-        self._initial_dof_pos = torch.zeros_like(self._dof_pos, device=self.device, dtype=torch.float)
-        self._initial_dof_vel = torch.zeros_like(self._dof_vel, device=self.device, dtype=torch.float)
-        
+   
         self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
         bodies_per_env = self._rigid_body_state.shape[0] // self.num_envs
         rigid_body_state_reshaped = self._rigid_body_state.view(self.num_envs, bodies_per_env, 13)
@@ -613,10 +608,9 @@ class Humanoid(BaseTask):
         return obs
 
     def _reset_actors(self, env_ids):
-        self._humanoid_root_states[env_ids] = self._initial_humanoid_root_states[env_ids]
-        self._dof_pos[env_ids] = self._initial_dof_pos[env_ids]
-        self._dof_vel[env_ids] = self._initial_dof_vel[env_ids]
-        return
+        raise NotImplementedError(
+        "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
+    )
 
     def pre_physics_step(self, actions):
         self.actions = actions.to(self.device).clone()
