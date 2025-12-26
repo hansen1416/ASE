@@ -4,7 +4,6 @@
 
 
 
-
 - can we merge the marker logic in reset env and reset actor, we probably only need key_pos
 
 - what is the purpose of `def fetch_amp_obs_demo(self, num_samples)` in humanoid_phc.py
@@ -15,8 +14,6 @@
 
 
 
-
-
 - load motion in multiple shapes
 
 
@@ -24,3 +21,15 @@
 
 
 - reward function like PHC
+
+
+- check if change betas in AMASS would cause foot penetration,
+
+
+- apply multi shapes loading to target motion loading
+
+
+- do we need to apply multi shape loading to descriminator
+
+
+- add target motion to observation space.
