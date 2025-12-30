@@ -42,6 +42,7 @@ class HumanoidPHC(Humanoid):
         return
 
     def post_physics_step(self):
+        # computes obs_buf inside the base class
         super().post_physics_step()
         
         self._update_hist_amp_obs()
