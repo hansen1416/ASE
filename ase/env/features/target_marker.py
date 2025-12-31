@@ -129,10 +129,33 @@ class TargetMarkerFeature(Feature):
 
 
     def on_reset_envs(self, task:HumanoidTask, env_ids) -> None:
+        """
+        One supporting fix: target_marker.py must not zero-out the sampled motion start time
+
+        Your marker feature currently does:
+
+        _ensure_vis_buffers() copies sampled motion ids/times (good)
+
+        on_reset_envs() overwrites _vis_motion_times[env_ids] = 0.0 (bad if you sample nonzero start times). 
+
+        target_marker
+
+        Change in TargetMarkerFeature.on_reset_envs():
+
+        # remove this line:
+        # self._vis_motion_times[env_ids] = 0.0
+        # keep the times set by _ensure_vis_buffers()
+
+        This makes markers stay aligned with the same motion_start_times you use for task obs.
+        """
+
+
         if not self.enabled:
             return
         self._ensure_vis_buffers(task)
         # reset visual time for the envs that reset
+
+        # todo AMP OBS, we need to consider random start
         self._vis_motion_times[env_ids] = 0.0
 
         if self._show_only_with_viewer and task.viewer is None:

@@ -584,6 +584,12 @@ class Humanoid(BaseTask):
         # torch.Size([num_envs, 358]) -> torch.Size([num_envs, 368]), 10 betas
         # load beta into observation ===============
 
+        # ---- target motion observation ----
+        if self._enable_task_obs:
+            task_obs = self._compute_task_obs_v7(env_ids)
+            obs = torch.cat([obs, task_obs], dim=-1)
+        # ---- target motion observation ----
+
         if (env_ids is None):
             self.obs_buf[:] = obs
         else:

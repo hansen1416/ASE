@@ -30,14 +30,24 @@ class HumanoidPHC(Humanoid):
                          device_id=device_id,
                          headless=headless)
 
-        motion_file = cfg['env']['motion_file']
-        self._load_motion(motion_file)
-
         self._amp_obs_buf = torch.zeros((self.num_envs, self._num_amp_obs_steps, self._num_amp_obs_per_step), device=self.device, dtype=torch.float)
         self._curr_amp_obs_buf = self._amp_obs_buf[:, 0]
         self._hist_amp_obs_buf = self._amp_obs_buf[:, 1:]
         
         self._amp_obs_demo_buf = None
+
+        motion_file = cfg['env']['motion_file']
+        self._load_motion(motion_file)
+
+        # ---- target motion observation ----
+        # spawn anchor for each env (keeps envs separated in world)
+        self._spawn_root_pos = self._humanoid_root_states[:, 0:3].clone()
+
+        # PHC-style reference bookkeeping
+        self._sampled_motion_ids = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self._motion_start_times = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
+        self._global_offset = torch.zeros(self.num_envs, 3, dtype=torch.float, device=self.device)
+        # ---- target motion observation ----
 
         return
 
@@ -154,6 +164,13 @@ class HumanoidPHC(Humanoid):
         # 196
         # print(self._num_amp_obs_per_step)
 
+        # ---- target motion observation ----
+        self._enable_task_obs = True
+        self._task_obs_v = 7
+        self._num_task_obs = 9 * len(key_bodies)   # [Δp_local, Δv_local, p*_rel_local]
+        self._num_obs += self._num_task_obs
+        # ---- target motion observation ----
+
         return
 
     def _load_motion(self, motion_file):
@@ -213,11 +230,23 @@ class HumanoidPHC(Humanoid):
         num_envs = env_ids.shape[0]
         
         motion_ids = self._motion_lib.sample_motions(num_envs)
-        motion_times = torch.zeros(num_envs, device=self.device)
+
+        # ---- target motion observation ----
+        # random start time (ensure AMP history queries stay >= 0)
+        truncate_time = self.dt * (self._num_amp_obs_steps - 1)
+        motion_times = self._motion_lib.sample_time(motion_ids, truncate_time=truncate_time)
+        motion_times = motion_times + truncate_time
+        # ---- target motion observation ----
 
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                = self._motion_lib.get_motion_state(motion_ids, motion_times)
         
+        # ---- target motion observation ----
+        # anchor motion into each env’s spawn location (PHC-style global_offset)
+        global_offset = self._spawn_root_pos[env_ids] - root_pos
+        root_pos = root_pos + global_offset
+        # ---- target motion observation ----
+
         # ---- 1211 --- enforce morphology-aware safe height on z ---
         safe_h = self._safe_root_heights[env_ids].unsqueeze(-1)  # [N, 1]
         z = root_pos[:, 2:3]
@@ -236,6 +265,13 @@ class HumanoidPHC(Humanoid):
         self._reset_ref_env_ids = env_ids
         self._reset_ref_motion_ids = motion_ids
         self._reset_ref_motion_times = motion_times
+
+
+        # ---- target motion observation ----
+        self._sampled_motion_ids[env_ids] = motion_ids
+        self._motion_start_times[env_ids] = motion_times
+        self._global_offset[env_ids] = global_offset
+        # ---- target motion observation ----
         return
 
     def _init_amp_obs(self, env_ids):
@@ -312,6 +348,33 @@ class HumanoidPHC(Humanoid):
                                                                    self._dof_obs_size, self._dof_offsets)
         return
 
+    # ---- target motion observation ----
+    def _compute_task_obs_v7(self, env_ids=None):
+        if env_ids is None:
+            env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
+
+        root_pos = self._rigid_body_pos[env_ids, 0, :]
+        root_rot = self._rigid_body_rot[env_ids, 0, :]
+
+        body_pos = self._rigid_body_pos[env_ids][:, self._key_body_ids, :]
+        body_vel = self._rigid_body_vel[env_ids][:, self._key_body_ids, :]
+
+        motion_ids = self._sampled_motion_ids[env_ids]
+        t = (self.progress_buf[env_ids].float() + 1.0) * self.dt + \
+            self._motion_start_times[env_ids]
+
+        # reference key positions (and finite-diff key velocities)
+        _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(motion_ids, t)
+        _, _, _, _, _, _, key_pos_next = self._motion_lib.get_motion_state(motion_ids, t + self.dt)
+
+        # anchor into env
+        offset = self._global_offset[env_ids].unsqueeze(1)
+        ref_pos = key_pos + offset
+        ref_vel = (key_pos_next - key_pos) / self.dt
+
+        return compute_task_obs_v7_1step(root_pos, root_rot, body_pos, body_vel, ref_pos, ref_vel)
+    # ---- target motion observation ----
+
 
 #####################################################################
 ###=========================jit functions=========================###
@@ -352,3 +415,25 @@ def build_amp_observations(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, 
     dof_obs = dof_to_obs(dof_pos, dof_obs_size, dof_offsets)
     obs = torch.cat((root_h_obs, root_rot_obs, local_root_vel, local_root_ang_vel, dof_obs, dof_vel, flat_local_key_pos), dim=-1)
     return obs
+
+# ---- target motion observation ----
+@torch.jit.script
+def compute_task_obs_v7_1step(root_pos, root_rot, body_pos, body_vel, ref_pos, ref_vel):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
+    # root_pos: (B,3), root_rot:(B,4)
+    # body_pos/body_vel/ref_pos/ref_vel: (B,J,3)
+    B, J, _ = body_pos.shape
+
+    heading_inv = torch_utils.calc_heading_quat_inv(root_rot)         # (B,4)
+    heading_inv = heading_inv.unsqueeze(1).repeat(1, J, 1)            # (B,J,4)
+
+    dp = ref_pos - body_pos
+    dv = ref_vel - body_vel
+    ref_rel = ref_pos - root_pos.unsqueeze(1)
+
+    dp_l = quat_rotate(heading_inv.reshape(-1,4), dp.reshape(-1,3)).view(B, J * 3)
+    dv_l = quat_rotate(heading_inv.reshape(-1,4), dv.reshape(-1,3)).view(B, J * 3)
+    rr_l = quat_rotate(heading_inv.reshape(-1,4), ref_rel.reshape(-1,3)).view(B, J * 3)
+
+    return torch.cat([dp_l, dv_l, rr_l], dim=-1)   # (B, 9*J)
+# ---- target motion observation ----

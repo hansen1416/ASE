@@ -1,5 +1,3 @@
-
-
 - can we merge the marker logic in reset env and reset actor, we probably only need key_pos. To do this, we need to first figure out how PHC build its observation, it should use the target motion as part of the observation.
 
 figure out these logic, if 
