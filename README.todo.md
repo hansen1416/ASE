@@ -1,3 +1,10 @@
+- move _compute_observations to humanoid_phc, so we can move `_compute_task_obs_v7` to humanoid_phc, 
+then in `_compute_task_obs_v7` we can pass `key_pos` to red marker hooks
+
+- merge humanoid.py and humanoid_phc.py, HumanoidPHC will inherit BaseTask directly
+
+
+
 - can we merge the marker logic in reset env and reset actor, we probably only need key_pos. To do this, we need to first figure out how PHC build its observation, it should use the target motion as part of the observation.
 
 figure out these logic, if 
