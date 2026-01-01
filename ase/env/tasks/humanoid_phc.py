@@ -297,6 +297,11 @@ class HumanoidPHC(Humanoid):
         # super()._reset_envs(env_ids)
 
         if (len(env_ids) > 0):
+            # 
+            self.progress_buf[env_ids] = 0
+            self.reset_buf[env_ids] = 0
+            self._terminate_buf[env_ids] = 0
+
             self._reset_actors(env_ids)
             self._reset_env_tensors(env_ids)
             self._refresh_sim_tensors()
@@ -339,13 +344,14 @@ class HumanoidPHC(Humanoid):
         root_pos[:, 2:3] = torch.maximum(z, safe_h)
         # -------------------------------------------------
 
-        self._set_env_state(env_ids=env_ids, 
-                            root_pos=root_pos, 
-                            root_rot=root_rot, 
-                            dof_pos=dof_pos, 
-                            root_vel=root_vel, 
-                            root_ang_vel=root_ang_vel, 
-                            dof_vel=dof_vel)
+        # set env actor state
+        self._humanoid_root_states[env_ids, 0:3] = root_pos
+        self._humanoid_root_states[env_ids, 3:7] = root_rot
+        self._humanoid_root_states[env_ids, 7:10] = root_vel
+        self._humanoid_root_states[env_ids, 10:13] = root_ang_vel
+        
+        self._dof_pos[env_ids] = dof_pos
+        self._dof_vel[env_ids] = dof_vel
 
         self._reset_ref_env_ids = env_ids
         self._reset_ref_motion_ids = motion_ids
@@ -373,10 +379,6 @@ class HumanoidPHC(Humanoid):
         self.gym.set_dof_position_target_tensor_indexed(self.sim,
                                                       gymtorch.unwrap_tensor(dof_pos),
                                                       gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-
-        self.progress_buf[env_ids] = 0
-        self.reset_buf[env_ids] = 0
-        self._terminate_buf[env_ids] = 0
         
         return
 
@@ -414,16 +416,6 @@ class HumanoidPHC(Humanoid):
                                               self._local_root_obs, self._root_height_obs, 
                                               self._dof_obs_size, self._dof_offsets)
         self._hist_amp_obs_buf[env_ids] = amp_obs_demo.view(self._hist_amp_obs_buf[env_ids].shape)
-        return
-    
-    def _set_env_state(self, env_ids, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel):
-        self._humanoid_root_states[env_ids, 0:3] = root_pos
-        self._humanoid_root_states[env_ids, 3:7] = root_rot
-        self._humanoid_root_states[env_ids, 7:10] = root_vel
-        self._humanoid_root_states[env_ids, 10:13] = root_ang_vel
-        
-        self._dof_pos[env_ids] = dof_pos
-        self._dof_vel[env_ids] = dof_vel
         return
 
     def _update_hist_amp_obs(self, env_ids=None):
@@ -467,19 +459,19 @@ class HumanoidPHC(Humanoid):
         body_vel = self._rigid_body_vel[env_ids][:, self._key_body_ids, :]
 
         motion_ids = self._sampled_motion_ids[env_ids]
-        t = (self.progress_buf[env_ids].float() + 1.0) * self.dt + \
+        t = (self.progress_buf[env_ids].float() + 0.0) * self.dt + \
             self._motion_start_times[env_ids]
 
         # reference key positions (and finite-diff key velocities)
-        _, _, _, _, _, _, key_pos = self._motion_lib.get_motion_state(motion_ids, t)
-        _, _, _, _, _, _, key_pos_next = self._motion_lib.get_motion_state(motion_ids, t + self.dt)
+        target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel, target_key_pos = self._motion_lib.get_motion_state(motion_ids, t)
+        target_root_pos_next, target_root_rot_next, target_dof_pos_next, target_root_vel_next, target_root_ang_vel_next, target_dof_vel_next, target_key_pos_next = self._motion_lib.get_motion_state(motion_ids, t + self.dt)
 
         # anchor into env
         offset = self._global_offset[env_ids].unsqueeze(1)
-        ref_pos = key_pos + offset
-        ref_vel = (key_pos_next - key_pos) / self.dt
+        ref_pos = target_key_pos + offset
+        ref_vel = (target_key_pos_next - target_key_pos) / self.dt
 
-        return key_pos, key_pos_next, compute_task_obs_v7_1step(root_pos, root_rot, body_pos, body_vel, ref_pos, ref_vel)
+        return target_key_pos, target_key_pos_next, compute_task_obs_v7_1step(root_pos, root_rot, body_pos, body_vel, ref_pos, ref_vel)
     # ---- target motion observation ----
 
 

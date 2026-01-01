@@ -165,12 +165,12 @@ class Humanoid(BaseTask):
 
     def _reset_envs(self, env_ids):
         raise NotImplementedError(
-            "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
+            "Base Humanoid reset removed. Use HumanoidPHC."
         )
     
     def _reset_actors(self, env_ids):
         raise NotImplementedError(
-        "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
+        "Base Humanoid reset removed. Use HumanoidPHC."
     )
 
     def _create_ground_plane(self):
@@ -542,7 +542,7 @@ class Humanoid(BaseTask):
 
     def post_physics_step(self):
         raise NotImplementedError(
-            "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
+            "Base Humanoid reset removed. Use HumanoidPHC."
         )
 
     def render(self, sync_frame_time=False):
