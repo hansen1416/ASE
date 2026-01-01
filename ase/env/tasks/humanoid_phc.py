@@ -59,7 +59,9 @@ class HumanoidPHC(Humanoid):
 
         self._refresh_sim_tensors()
 
-        key_pos, key_pos_next = self._compute_observations()
+        target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel,target_key_pos, target_key_pos_next, task_obs = self._compute_task_obs_v7()
+
+        self._compute_observations(task_obs=task_obs)
         self._compute_reward(self.actions)
         self._compute_reset()
         
@@ -73,7 +75,7 @@ class HumanoidPHC(Humanoid):
         self.extras["amp_obs"] = amp_obs_flat
 
         # fetures plugin -------------
-        for f in self._features: f.on_post_physics_step(self, key_pos_next)
+        for f in self._features: f.on_post_physics_step(self, target_key_pos_next)
         # fetures plugin -------------
 
         return
@@ -232,7 +234,7 @@ class HumanoidPHC(Humanoid):
         self.gym.refresh_net_contact_force_tensor(self.sim)
         return
 
-    def _compute_observations(self, env_ids=None):
+    def _compute_observations(self, env_ids=None, task_obs=None):
         obs = self._compute_humanoid_obs(env_ids)
 
         # load beta into observation ===============
@@ -250,8 +252,7 @@ class HumanoidPHC(Humanoid):
         # load beta into observation ===============
 
         # ---- target motion observation ----
-        if self._enable_task_obs:
-            key_pos, key_pos_next, task_obs = self._compute_task_obs_v7(env_ids)
+        if task_obs is not None:
             obs = torch.cat([obs, task_obs], dim=-1)
         # ---- target motion observation ----
 
@@ -260,7 +261,7 @@ class HumanoidPHC(Humanoid):
         else:
             self.obs_buf[env_ids] = obs
 
-        return key_pos, key_pos_next
+        return
 
     def _compute_humanoid_obs(self, env_ids=None):
         if (env_ids is None):
@@ -302,34 +303,49 @@ class HumanoidPHC(Humanoid):
             self.reset_buf[env_ids] = 0
             self._terminate_buf[env_ids] = 0
 
-            self._reset_actors(env_ids)
+            num_envs = env_ids.shape[0]
+            self._sampled_motion_ids[env_ids] = self._motion_lib.sample_motions(num_envs)
+
+            truncate_time = self.dt * (self._num_amp_obs_steps - 1)
+            motion_times = self._motion_lib.sample_time(self._sampled_motion_ids[env_ids], truncate_time=truncate_time)
+            motion_times = motion_times + truncate_time
+
+            self._reset_ref_env_ids = env_ids
+            self._reset_ref_motion_ids = self._sampled_motion_ids[env_ids]
+            self._reset_ref_motion_times = motion_times
+
+            self._motion_start_times[env_ids] = motion_times
+
+            target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel,target_key_pos, target_key_pos_next, task_obs = self._compute_task_obs_v7(env_ids=env_ids)
+
+            self._reset_actors(env_ids, target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel)
             self._reset_env_tensors(env_ids)
             self._refresh_sim_tensors()
-            key_pos, key_pos_next = self._compute_observations(env_ids)
+            self._compute_observations(env_ids=env_ids, task_obs=task_obs)
 
             # fetures plugin -------------
-            for f in self._features: f.on_reset_envs(self, env_ids, key_pos)
+            for f in self._features: f.on_reset_envs(self, env_ids, target_key_pos)
             # fetures plugin -------------
 
         self._init_amp_obs(env_ids)
 
         return
 
-    def _reset_actors(self, env_ids):
+    def _reset_actors(self, env_ids, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel):
 
-        num_envs = env_ids.shape[0]
+        # num_envs = env_ids.shape[0]
         
-        motion_ids = self._motion_lib.sample_motions(num_envs)
+        # motion_ids = self._motion_lib.sample_motions(num_envs)
 
         # ---- target motion observation ----
         # random start time (ensure AMP history queries stay >= 0)
-        truncate_time = self.dt * (self._num_amp_obs_steps - 1)
-        motion_times = self._motion_lib.sample_time(motion_ids, truncate_time=truncate_time)
-        motion_times = motion_times + truncate_time
+        # truncate_time = self.dt * (self._num_amp_obs_steps - 1)
+        # motion_times = self._motion_lib.sample_time(motion_ids, truncate_time=truncate_time)
+        # motion_times = motion_times + truncate_time
         # ---- target motion observation ----
 
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-               = self._motion_lib.get_motion_state(motion_ids, motion_times)
+        # root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
+        #        = self._motion_lib.get_motion_state(motion_ids, motion_times)
         
         # ---- target motion observation ----
         # anchor motion into each env’s spawn location (PHC-style global_offset)
@@ -353,14 +369,14 @@ class HumanoidPHC(Humanoid):
         self._dof_pos[env_ids] = dof_pos
         self._dof_vel[env_ids] = dof_vel
 
-        self._reset_ref_env_ids = env_ids
-        self._reset_ref_motion_ids = motion_ids
-        self._reset_ref_motion_times = motion_times
+        # self._reset_ref_env_ids = env_ids
+        # self._reset_ref_motion_ids = motion_ids
+        # self._reset_ref_motion_times = motion_times
 
 
         # ---- target motion observation ----
-        self._sampled_motion_ids[env_ids] = motion_ids
-        self._motion_start_times[env_ids] = motion_times
+        # self._sampled_motion_ids[env_ids] = motion_ids
+        # self._motion_start_times[env_ids] = motion_times
         self._global_offset[env_ids] = global_offset
         # ---- target motion observation ----
         return
@@ -459,7 +475,7 @@ class HumanoidPHC(Humanoid):
         body_vel = self._rigid_body_vel[env_ids][:, self._key_body_ids, :]
 
         motion_ids = self._sampled_motion_ids[env_ids]
-        t = (self.progress_buf[env_ids].float() + 0.0) * self.dt + \
+        t = self.progress_buf[env_ids].float() * self.dt + \
             self._motion_start_times[env_ids]
 
         # reference key positions (and finite-diff key velocities)
@@ -471,7 +487,9 @@ class HumanoidPHC(Humanoid):
         ref_pos = target_key_pos + offset
         ref_vel = (target_key_pos_next - target_key_pos) / self.dt
 
-        return target_key_pos, target_key_pos_next, compute_task_obs_v7_1step(root_pos, root_rot, body_pos, body_vel, ref_pos, ref_vel)
+        task_obs = compute_task_obs_v7_1step(root_pos, root_rot, body_pos, body_vel, ref_pos, ref_vel)
+
+        return target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel,target_key_pos, target_key_pos_next, task_obs
     # ---- target motion observation ----
 
 
