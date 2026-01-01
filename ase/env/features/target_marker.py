@@ -40,23 +40,6 @@ class TargetMarkerFeature(Feature):
         self._marker_pos = None         # view: [num_envs, K, 3]
         self._marker_actor_ids = None   # [num_envs*K] int32 (global actor ids)
 
-        # PHC-side buffers (safe even if not used)
-        self._vis_motion_ids = None     # [num_envs]
-        self._vis_motion_times = None   # [num_envs]
-
-
-    # ---- internals ----
-    def _ensure_vis_buffers(self, task:HumanoidTask, env_ids = None) -> None:
-        if self._vis_motion_ids is None or self._vis_motion_times is None:
-            self._vis_motion_ids = torch.zeros(task.num_envs, device=task.device, dtype=torch.long)
-            self._vis_motion_times = torch.zeros(task.num_envs, device=task.device, dtype=torch.float32)
-
-        motion_ids = getattr(self, '_reset_ref_motion_ids', None)
-        motion_times = getattr(self, '_reset_ref_motion_times', None)
-
-        if motion_ids is not None and motion_times is not None and env_ids is not None:
-            self._vis_motion_ids[env_ids] = self._reset_ref_motion_ids
-            self._vis_motion_times[env_ids] = self._reset_ref_motion_times
 
     # ---- hooks ----
     def on_create_envs(self, task:HumanoidTask, num_envs: int) -> None:
@@ -101,8 +84,6 @@ class TargetMarkerFeature(Feature):
         if not self.enabled:
             return
 
-        self._ensure_vis_buffers(task)
-
         num_actors = task._root_states.shape[0] // task.num_envs
         root_view = task._root_states.view(task.num_envs, num_actors, task._root_states.shape[-1])
 
@@ -126,70 +107,25 @@ class TargetMarkerFeature(Feature):
             len(self._marker_actor_ids),
         )
         
-
-
-    def on_reset_envs(self, task:HumanoidTask, env_ids) -> None:
-        """
-        One supporting fix: target_marker.py must not zero-out the sampled motion start time
-
-        Your marker feature currently does:
-
-        _ensure_vis_buffers() copies sampled motion ids/times (good)
-
-        on_reset_envs() overwrites _vis_motion_times[env_ids] = 0.0 (bad if you sample nonzero start times). 
-
-        target_marker
-
-        Change in TargetMarkerFeature.on_reset_envs():
-
-        # remove this line:
-        # self._vis_motion_times[env_ids] = 0.0
-        # keep the times set by _ensure_vis_buffers()
-
-        This makes markers stay aligned with the same motion_start_times you use for task obs.
-        """
-
-
+    def on_reset_envs(self, task:HumanoidTask, env_ids, key_pos) -> None:
         if not self.enabled:
             return
-        self._ensure_vis_buffers(task)
         # reset visual time for the envs that reset
-
-        # todo AMP OBS, we need to consider random start
-        self._vis_motion_times[env_ids] = 0.0
-
         if self._show_only_with_viewer and task.viewer is None:
             return
-        # show immediately on reset frame (optional)
-        self._update_markers(task, env_ids=env_ids, use_next_step=False)
-        
 
-    def on_post_physics_step(self, task:HumanoidTask) -> None:
+        # show immediately on reset frame (optional)
+        self._update_markers(task, env_ids=env_ids, key_pos=key_pos)
+
+    def on_post_physics_step(self, task:HumanoidTask, key_pos) -> None:
         if not self.enabled:
             return
         if self._show_only_with_viewer and task.viewer is None:
             return
 
-        self._vis_motion_times += task.dt
-        self._update_markers(task, env_ids=None, use_next_step=True)
-        
+        self._update_markers(task, env_ids=None, key_pos=key_pos)
 
-    def _update_markers(self, task:HumanoidTask, env_ids=None, use_next_step: bool = True) -> None:
-        # needs MotionLib (HumanoidPHC provides task._motion_lib)
-        motion_lib = getattr(task, "_motion_lib", None)
-        if motion_lib is None or self._marker_pos is None:
-            return
-
-        if env_ids is None or len(env_ids) == 0:
-            env_ids = torch.arange(task.num_envs, device=task.device, dtype=torch.long)
-
-        t = self._vis_motion_times[env_ids]
-        if use_next_step:
-            t = t + task.dt
-
-        motion_ids = self._vis_motion_ids[env_ids]
-        *_, key_pos = motion_lib.get_motion_state(motion_ids, t)
-
+    def _update_markers(self, task:HumanoidTask, env_ids=None, key_pos=None) -> None:
         self._marker_pos[env_ids] = key_pos  # [N, K, 3]
 
         marker_ids = self._marker_actor_ids.view(task.num_envs, self._num_markers)[env_ids].reshape(-1)

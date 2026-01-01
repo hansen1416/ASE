@@ -164,33 +164,14 @@ class Humanoid(BaseTask):
         return
 
     def _reset_envs(self, env_ids):
-        if (len(env_ids) > 0):
-            self._reset_actors(env_ids)
-            self._reset_env_tensors(env_ids)
-            self._refresh_sim_tensors()
-            self._compute_observations(env_ids)
-        return
-
-    def _reset_env_tensors(self, env_ids):
-        env_ids_int32 = self._humanoid_actor_ids[env_ids]
-        self.gym.set_actor_root_state_tensor_indexed(self.sim,
-                                                     gymtorch.unwrap_tensor(self._root_states),
-                                                     gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-        self.gym.set_dof_state_tensor_indexed(self.sim,
-                                              gymtorch.unwrap_tensor(self._dof_state),
-                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-        
-        dof_pos = self._dof_state[..., :, 0]
-        dof_pos = dof_pos.contiguous()
-        self.gym.set_dof_position_target_tensor_indexed(self.sim,
-                                                      gymtorch.unwrap_tensor(dof_pos),
-                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-
-        self.progress_buf[env_ids] = 0
-        self.reset_buf[env_ids] = 0
-        self._terminate_buf[env_ids] = 0
-        
-        return
+        raise NotImplementedError(
+            "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
+        )
+    
+    def _reset_actors(self, env_ids):
+        raise NotImplementedError(
+        "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
+    )
 
     def _create_ground_plane(self):
         plane_params = gymapi.PlaneParams()
@@ -546,78 +527,6 @@ class Humanoid(BaseTask):
     def _get_humanoid_collision_filter(self):
         return 0
 
-    def _compute_reward(self, actions):
-        self.rew_buf[:] = compute_humanoid_reward(self.obs_buf)
-        return
-
-    def _compute_reset(self):
-        self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(self.reset_buf, self.progress_buf,
-                                                   self._contact_forces, self._contact_body_ids,
-                                                   self._rigid_body_pos, self.max_episode_length,
-                                                   self._enable_early_termination, self._termination_heights)
-        return
-
-    def _refresh_sim_tensors(self):
-        self.gym.refresh_dof_state_tensor(self.sim)
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
-
-        self.gym.refresh_force_sensor_tensor(self.sim)
-        self.gym.refresh_dof_force_tensor(self.sim)
-        self.gym.refresh_net_contact_force_tensor(self.sim)
-        return
-
-    def _compute_observations(self, env_ids=None):
-        obs = self._compute_humanoid_obs(env_ids)
-
-        # load beta into observation ===============
-        # append shape betas for smpl assets
-        if env_ids is None:
-            betas = self._betas_env                        # [num_envs, B]
-        else:
-            betas = self._betas_env[env_ids]               # [len(env_ids), B]
-
-        # optional: simple normalisation to keep magnitudes modest
-        betas = betas / 3.0
-
-        obs = torch.cat([obs, betas], dim=-1)
-        # torch.Size([num_envs, 358]) -> torch.Size([num_envs, 368]), 10 betas
-        # load beta into observation ===============
-
-        # ---- target motion observation ----
-        if self._enable_task_obs:
-            task_obs = self._compute_task_obs_v7(env_ids)
-            obs = torch.cat([obs, task_obs], dim=-1)
-        # ---- target motion observation ----
-
-        if (env_ids is None):
-            self.obs_buf[:] = obs
-        else:
-            self.obs_buf[env_ids] = obs
-
-        return
-
-    def _compute_humanoid_obs(self, env_ids=None):
-        if (env_ids is None):
-            body_pos = self._rigid_body_pos
-            body_rot = self._rigid_body_rot
-            body_vel = self._rigid_body_vel
-            body_ang_vel = self._rigid_body_ang_vel
-        else:
-            body_pos = self._rigid_body_pos[env_ids]
-            body_rot = self._rigid_body_rot[env_ids]
-            body_vel = self._rigid_body_vel[env_ids]
-            body_ang_vel = self._rigid_body_ang_vel[env_ids]
-        
-        obs = compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, self._local_root_obs,
-                                                self._root_height_obs)
-        return obs
-
-    def _reset_actors(self, env_ids):
-        raise NotImplementedError(
-        "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
-    )
-
     def pre_physics_step(self, actions):
         self.actions = actions.to(self.device).clone()
         if (self._pd_control):
@@ -632,17 +541,9 @@ class Humanoid(BaseTask):
         return
 
     def post_physics_step(self):
-        self.progress_buf += 1
-
-        self._refresh_sim_tensors()
-
-        self._compute_observations()
-        self._compute_reward(self.actions)
-        self._compute_reset()
-        
-        self.extras["terminate"] = self._terminate_buf
-
-        return
+        raise NotImplementedError(
+            "Base Humanoid reset removed. Use HumanoidPHC which resets via motion (_set_env_state)."
+        )
 
     def render(self, sync_frame_time=False):
         # if self.viewer:
@@ -721,120 +622,5 @@ def dof_to_obs(pose, dof_obs_size, dof_offsets):
 
     return dof_obs
 
-@torch.jit.script
-def compute_humanoid_observations(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos,
-                                  local_root_obs, root_height_obs, dof_obs_size, dof_offsets):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, bool, bool, int, List[int]) -> Tensor
-    root_h = root_pos[:, 2:3]
-    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
-
-    if (local_root_obs):
-        root_rot_obs = quat_mul(heading_rot, root_rot)
-    else:
-        root_rot_obs = root_rot
-    root_rot_obs = torch_utils.quat_to_tan_norm(root_rot_obs)
-    
-    if (not root_height_obs):
-        root_h_obs = torch.zeros_like(root_h)
-    else:
-        root_h_obs = root_h
-    
-    local_root_vel = quat_rotate(heading_rot, root_vel)
-    local_root_ang_vel = quat_rotate(heading_rot, root_ang_vel)
-
-    root_pos_expand = root_pos.unsqueeze(-2)
-    local_key_body_pos = key_body_pos - root_pos_expand
-    
-    heading_rot_expand = heading_rot.unsqueeze(-2)
-    heading_rot_expand = heading_rot_expand.repeat((1, local_key_body_pos.shape[1], 1))
-    flat_end_pos = local_key_body_pos.view(local_key_body_pos.shape[0] * local_key_body_pos.shape[1], local_key_body_pos.shape[2])
-    flat_heading_rot = heading_rot_expand.view(heading_rot_expand.shape[0] * heading_rot_expand.shape[1], 
-                                               heading_rot_expand.shape[2])
-    local_end_pos = quat_rotate(flat_heading_rot, flat_end_pos)
-    flat_local_key_pos = local_end_pos.view(local_key_body_pos.shape[0], local_key_body_pos.shape[1] * local_key_body_pos.shape[2])
-
-    dof_obs = dof_to_obs(dof_pos, dof_obs_size, dof_offsets)
-
-    obs = torch.cat((root_h_obs, root_rot_obs, local_root_vel, local_root_ang_vel, dof_obs, dof_vel, flat_local_key_pos), dim=-1)
-    return obs
-
-@torch.jit.script
-def compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs):
-    # type: (Tensor, Tensor, Tensor, Tensor, bool, bool) -> Tensor
-    root_pos = body_pos[:, 0, :]
-    root_rot = body_rot[:, 0, :]
-
-    root_h = root_pos[:, 2:3]
-    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
-    
-    if (not root_height_obs):
-        root_h_obs = torch.zeros_like(root_h)
-    else:
-        root_h_obs = root_h
-    
-    heading_rot_expand = heading_rot.unsqueeze(-2)
-    heading_rot_expand = heading_rot_expand.repeat((1, body_pos.shape[1], 1))
-    flat_heading_rot = heading_rot_expand.reshape(heading_rot_expand.shape[0] * heading_rot_expand.shape[1], 
-                                               heading_rot_expand.shape[2])
-    
-    root_pos_expand = root_pos.unsqueeze(-2)
-    local_body_pos = body_pos - root_pos_expand
-    flat_local_body_pos = local_body_pos.reshape(local_body_pos.shape[0] * local_body_pos.shape[1], local_body_pos.shape[2])
-    flat_local_body_pos = quat_rotate(flat_heading_rot, flat_local_body_pos)
-    local_body_pos = flat_local_body_pos.reshape(local_body_pos.shape[0], local_body_pos.shape[1] * local_body_pos.shape[2])
-    local_body_pos = local_body_pos[..., 3:] # remove root pos
-
-    flat_body_rot = body_rot.reshape(body_rot.shape[0] * body_rot.shape[1], body_rot.shape[2])
-    flat_local_body_rot = quat_mul(flat_heading_rot, flat_body_rot)
-    flat_local_body_rot_obs = torch_utils.quat_to_tan_norm(flat_local_body_rot)
-    local_body_rot_obs = flat_local_body_rot_obs.reshape(body_rot.shape[0], body_rot.shape[1] * flat_local_body_rot_obs.shape[1])
-    
-    if (local_root_obs):
-        root_rot_obs = torch_utils.quat_to_tan_norm(root_rot)
-        local_body_rot_obs[..., 0:6] = root_rot_obs
-
-    flat_body_vel = body_vel.reshape(body_vel.shape[0] * body_vel.shape[1], body_vel.shape[2])
-    flat_local_body_vel = quat_rotate(flat_heading_rot, flat_body_vel)
-    local_body_vel = flat_local_body_vel.reshape(body_vel.shape[0], body_vel.shape[1] * body_vel.shape[2])
-    
-    flat_body_ang_vel = body_ang_vel.reshape(body_ang_vel.shape[0] * body_ang_vel.shape[1], body_ang_vel.shape[2])
-    flat_local_body_ang_vel = quat_rotate(flat_heading_rot, flat_body_ang_vel)
-    local_body_ang_vel = flat_local_body_ang_vel.reshape(body_ang_vel.shape[0], body_ang_vel.shape[1] * body_ang_vel.shape[2])
-    
-    obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel), dim=-1)
-    return obs
 
 
-@torch.jit.script
-def compute_humanoid_reward(obs_buf):
-    # type: (Tensor) -> Tensor
-    reward = torch.ones_like(obs_buf[:, 0])
-    return reward
-
-@torch.jit.script
-def compute_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos,
-                           max_episode_length, enable_early_termination, termination_heights):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, bool, Tensor) -> Tuple[Tensor, Tensor]
-    terminated = torch.zeros_like(reset_buf)
-
-    if (enable_early_termination):
-        masked_contact_buf = contact_buf.clone()
-        masked_contact_buf[:, contact_body_ids, :] = 0
-        fall_contact = torch.any(torch.abs(masked_contact_buf) > 0.1, dim=-1)
-        fall_contact = torch.any(fall_contact, dim=-1)
-
-        body_height = rigid_body_pos[..., 2]
-        fall_height = body_height < termination_heights
-        fall_height[:, contact_body_ids] = False
-        fall_height = torch.any(fall_height, dim=-1)
-
-        has_fallen = torch.logical_and(fall_contact, fall_height)
-
-        # first timestep can sometimes still have nonzero contact forces
-        # so only check after first couple of steps
-        has_fallen *= (progress_buf > 1)
-        terminated = torch.where(has_fallen, torch.ones_like(reset_buf), terminated)
-    
-    reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
-
-    return reset, terminated

@@ -18,10 +18,10 @@ class Feature(ABC):
         """Called after task._root_states / actor ids are ready."""
         pass
 
-    def on_reset_envs(self, task:HumanoidTask, env_ids) -> None:
+    def on_reset_envs(self, task:HumanoidTask, env_ids, key_pos) -> None:
         pass
 
-    def on_post_physics_step(self, task:HumanoidTask) -> None:
+    def on_post_physics_step(self, task:HumanoidTask, key_pos) -> None:
         pass
 
     def on_render(self, task:HumanoidTask, sync_frame_time: bool=False) -> None:

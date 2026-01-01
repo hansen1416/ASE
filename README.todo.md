@@ -1,3 +1,10 @@
+- use global `motion_times`, in reset_actor and `_compute_observations`. extract `_compute_task_obs_v7` to top level, calculate obs, key_pos, and pass them to reset_actor and _compute_observations.
+
+so we don't have to calculate motion state in `reset_actor`
+
+- the time in marker feature isn't right, self._vis_motion_times in on_reset_envs and on_post_physics_step
+
+
 - move _compute_observations to humanoid_phc, so we can move `_compute_task_obs_v7` to humanoid_phc, 
 then in `_compute_task_obs_v7` we can pass `key_pos` to red marker hooks
 
