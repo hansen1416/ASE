@@ -14,26 +14,3 @@
 ---------------
 
 
-
-### Reward: yes (mostly in the task/env code)
-
-In PHC the “tracking-style” reward is implemented as TorchScript kernels inside the imitation task utilities, not inside the policy network.
-
-* **Main imitation tracking reward** is `compute_imitation_reward(...)` in `humanoid_im.py`. It computes exponential kernels over **body position / rotation / linear velocity / angular velocity** tracking errors, then combines them with weights from `rwd_specs`. 
-* **Termination/reset** logic for imitation is also there (e.g., `compute_humanoid_im_reset(...)`). 
-* In contrast, in your ASE-side `humanoid.py`, the default `compute_humanoid_reward(...)` is just a placeholder returning ones. If your `HumanoidPHC` doesn’t override reward, training will effectively ignore tracking. 
-
-Also note: **AMP’s discriminator reward is *not* in the env**. It is computed in the agent:
-
-* `AMPAgent._calc_disc_rewards(...)` turns discriminator logits into a shaped reward (via a sigmoid → `-log(1-prob)`), then scales it. 
-
-### Neural network structure: no (it lives in rl_games “builder” + YAML)
-
-PHC (and ASE/AMP) follow the rl_games pattern: **task files define obs/reward/reset; network architecture is built by the RL framework**.
-
-* `run.py` registers which **agent/model/network builder** to use for `algo=amp` vs `algo=ase`. For AMP it wires `AMPAgent` + `ModelAMPContinuous` + `AMPBuilder`. 
-* The **actual actor–critic MLP and discriminator MLP** are constructed in `amp_network_builder.py` (see `eval_actor`, `eval_critic`, and `_build_disc`). The discriminator MLP sizes/activation come from config (YAML). 
-
-### Bonus: where PHC “goal deltas (+ lookahead)” obs is implemented
-
-PHC’s “goal-conditioned” observation (difference vectors in a heading-aligned local frame, optionally with futures/lookahead) is also in `humanoid_im.py` via functions like `compute_imitation_observations_v2/v3/v9/...` (they explicitly compute local-frame diffs using heading inverse rotation).
