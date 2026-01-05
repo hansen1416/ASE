@@ -64,7 +64,16 @@ motion_ids = motion_lib.sample_motions(num_envs)
 # tensor([2.9572], device='cuda:0')
 motion_times = motion_lib.sample_time(motion_ids, truncate_time=0.0)
 
-root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos = motion_lib.get_motion_state(motion_ids, motion_times)
+motion_res = motion_lib.get_motion_state(motion_ids, motion_times)
+
+root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
+        = (motion_res["root_pos"],
+        motion_res["root_rot"],
+        motion_res["dof_pos"],
+        motion_res["root_vel"],
+        motion_res["root_ang_vel"],
+        motion_res["dof_vel"],
+        motion_res["key_pos"])
 
 print("root_pos", root_pos.shape)
 print("root_rot", root_rot.shape)

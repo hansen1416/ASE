@@ -36,6 +36,12 @@ class HumanoidPHC(Humanoid):
         
         self._amp_obs_demo_buf = None
 
+        self.reward_specs = cfg["env"].get("reward_specs", {"k_pos": 100, "k_rot": 10, "k_vel": 0.1, "k_ang_vel": 0.1, "w_pos": 0.5, "w_rot": 0.3, "w_vel": 0.1, "w_ang_vel": 0.1})
+
+        self.power_reward = True
+        self.reward_raw = torch.zeros((self.num_envs, 5 if self.power_reward else 4)).to(self.device)
+        self.power_coefficient = cfg["env"].get("power_coefficient", 0.0005)
+
         motion_file = cfg['env']['motion_file']
         self._load_motion(motion_file)
 
@@ -59,10 +65,17 @@ class HumanoidPHC(Humanoid):
 
         self._refresh_sim_tensors()
 
-        target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel,target_key_pos, target_key_pos_next, task_obs = self._compute_task_obs_v7()
+        motion_res, motion_res_next, task_obs = self._compute_task_obs_v7()
+
+        ref_body_pos = motion_res["rg_pos"]
+        ref_body_rot = motion_res["rb_rot"]
+        ref_body_vel = motion_res["body_vel"]
+        ref_body_ang_vel = motion_res["body_ang_vel"]
+
+        ref_key_pos_next = motion_res_next["key_pos"]
 
         self._compute_observations(task_obs=task_obs)
-        self._compute_reward(self.actions)
+        self._compute_reward(ref_body_pos, ref_body_rot, ref_body_vel, ref_body_ang_vel)
         self._compute_reset()
         
         self.extras["terminate"] = self._terminate_buf
@@ -75,7 +88,7 @@ class HumanoidPHC(Humanoid):
         self.extras["amp_obs"] = amp_obs_flat
 
         # fetures plugin -------------
-        for f in self._features: f.on_post_physics_step(self, target_key_pos_next)
+        for f in self._features: f.on_post_physics_step(self, ref_key_pos_next)
         # fetures plugin -------------
 
         return
@@ -114,8 +127,18 @@ class HumanoidPHC(Humanoid):
 
         motion_ids = motion_ids.view(-1)
         motion_times = motion_times.view(-1)
+        
+        motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-               = self._motion_lib.get_motion_state(motion_ids, motion_times)
+               = (motion_res["root_pos"],
+                motion_res["root_rot"],
+                motion_res["dof_pos"],
+                motion_res["root_vel"],
+                motion_res["root_ang_vel"],
+                motion_res["dof_vel"],
+                motion_res["key_pos"])
+
         amp_obs_demo = build_amp_observations(root_pos, root_rot, root_vel, root_ang_vel,
                                               dof_pos, dof_vel, key_pos,
                                               self._local_root_obs, self._root_height_obs,
@@ -279,11 +302,6 @@ class HumanoidPHC(Humanoid):
                                                 self._root_height_obs)
         return obs
 
-
-    def _compute_reward(self, actions):
-        self.rew_buf[:] = compute_humanoid_reward(self.obs_buf)
-        return
-
     def _compute_reset(self):
         self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(self.reset_buf, self.progress_buf,
                                                    self._contact_forces, self._contact_body_ids,
@@ -316,7 +334,15 @@ class HumanoidPHC(Humanoid):
 
             self._motion_start_times[env_ids] = motion_times
 
-            target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel,target_key_pos, target_key_pos_next, task_obs = self._compute_task_obs_v7(env_ids=env_ids)
+            motion_res, motion_res_next, task_obs = self._compute_task_obs_v7(env_ids=env_ids)
+
+            target_root_pos     = motion_res["root_pos"]
+            target_root_rot     = motion_res["root_rot"]
+            target_dof_pos      = motion_res["dof_pos"]
+            target_root_vel     = motion_res["root_vel"]
+            target_root_ang_vel = motion_res["root_ang_vel"]
+            target_dof_vel      = motion_res["dof_vel"]
+            target_key_pos      = motion_res["key_pos"]
 
             self._reset_actors(env_ids, target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel)
             self._reset_env_tensors(env_ids)
@@ -343,9 +369,6 @@ class HumanoidPHC(Humanoid):
         # motion_times = self._motion_lib.sample_time(motion_ids, truncate_time=truncate_time)
         # motion_times = motion_times + truncate_time
         # ---- target motion observation ----
-
-        # root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-        #        = self._motion_lib.get_motion_state(motion_ids, motion_times)
         
         # ---- target motion observation ----
         # anchor motion into each env’s spawn location (PHC-style global_offset)
@@ -398,7 +421,6 @@ class HumanoidPHC(Humanoid):
         
         return
 
-
     def _init_amp_obs(self, env_ids):
         self._compute_amp_observations(env_ids)
 
@@ -425,8 +447,18 @@ class HumanoidPHC(Humanoid):
 
         motion_ids = motion_ids.view(-1)
         motion_times = motion_times.view(-1)
+        
+        motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-               = self._motion_lib.get_motion_state(motion_ids, motion_times)
+               = (motion_res["root_pos"],
+                motion_res["root_rot"],
+                motion_res["dof_pos"],
+                motion_res["root_vel"],
+                motion_res["root_ang_vel"],
+                motion_res["dof_vel"],
+                motion_res["key_pos"])
+
         amp_obs_demo = build_amp_observations(root_pos, root_rot, root_vel, root_ang_vel, 
                                               dof_pos, dof_vel, key_pos, 
                                               self._local_root_obs, self._root_height_obs, 
@@ -479,19 +511,37 @@ class HumanoidPHC(Humanoid):
             self._motion_start_times[env_ids]
 
         # reference key positions (and finite-diff key velocities)
-        target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel, target_key_pos = self._motion_lib.get_motion_state(motion_ids, t)
-        target_root_pos_next, target_root_rot_next, target_dof_pos_next, target_root_vel_next, target_root_ang_vel_next, target_dof_vel_next, target_key_pos_next = self._motion_lib.get_motion_state(motion_ids, t + self.dt)
+        motion_res      = self._motion_lib.get_motion_state(motion_ids, t)
+        motion_res_next = self._motion_lib.get_motion_state(motion_ids, t + self.dt)
 
         # anchor into env
         offset = self._global_offset[env_ids].unsqueeze(1)
-        ref_pos = target_key_pos + offset
-        ref_vel = (target_key_pos_next - target_key_pos) / self.dt
+        ref_pos = motion_res["key_pos"] + offset
+        ref_vel = ( motion_res_next["key_pos"] - motion_res["key_pos"]) / self.dt
 
         task_obs = compute_task_obs_v7_1step(root_pos, root_rot, body_pos, body_vel, ref_pos, ref_vel)
 
-        return target_root_pos, target_root_rot, target_dof_pos, target_root_vel, target_root_ang_vel, target_dof_vel,target_key_pos, target_key_pos_next, task_obs
+        return motion_res, motion_res_next, task_obs
     # ---- target motion observation ----
 
+    def _compute_reward(self, ref_body_pos, ref_body_rot, ref_body_vel, ref_body_ang_vel):
+        body_pos = self._rigid_body_pos
+        body_rot = self._rigid_body_rot
+        body_vel = self._rigid_body_vel
+        body_ang_vel = self._rigid_body_ang_vel
+
+        self.rew_buf[:], self.reward_raw = compute_imitation_reward(body_pos, body_rot, body_vel, body_ang_vel, ref_body_pos, ref_body_rot, ref_body_vel, ref_body_ang_vel, self.reward_specs)
+
+        if self.power_reward:
+            power = torch.abs(torch.multiply(self.dof_force_tensor, self._dof_vel)).sum(dim=-1) 
+            # power_reward = -0.00005 * (power ** 2)
+            power_reward = -self.power_coefficient * power
+            power_reward[self.progress_buf <= 3] = 0 # First 3 frame power reward should not be counted. since they could be dropped.
+
+            self.rew_buf[:] += power_reward
+            self.reward_raw = torch.cat([self.reward_raw, power_reward[:, None]], dim=-1)
+
+        return
 
 #####################################################################
 ###=========================jit functions=========================###
@@ -642,13 +692,6 @@ def compute_humanoid_observations(root_pos, root_rot, root_vel, root_ang_vel, do
 
 
 @torch.jit.script
-def compute_humanoid_reward(obs_buf):
-    # type: (Tensor) -> Tensor
-    reward = torch.ones_like(obs_buf[:, 0])
-    return reward
-
-
-@torch.jit.script
 def compute_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos,
                            max_episode_length, enable_early_termination, termination_heights):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, bool, Tensor) -> Tuple[Tensor, Tensor]
@@ -675,3 +718,37 @@ def compute_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_id
     reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
 
     return reset, terminated
+
+
+@torch.jit.script
+def compute_imitation_reward(body_pos, body_rot, body_vel, body_ang_vel, ref_body_pos, ref_body_rot, ref_body_vel, ref_body_ang_vel, rwd_specs):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor,Tensor, Tensor, Dict[str, float]) -> Tuple[Tensor, Tensor]
+    k_pos, k_rot, k_vel, k_ang_vel = rwd_specs["k_pos"], rwd_specs["k_rot"], rwd_specs["k_vel"], rwd_specs["k_ang_vel"]
+    w_pos, w_rot, w_vel, w_ang_vel = rwd_specs["w_pos"], rwd_specs["w_rot"], rwd_specs["w_vel"], rwd_specs["w_ang_vel"]
+
+    # body position reward
+    diff_global_body_pos = ref_body_pos - body_pos
+    diff_body_pos_dist = (diff_global_body_pos**2).mean(dim=-1).mean(dim=-1)
+    r_body_pos = torch.exp(-k_pos * diff_body_pos_dist)
+
+    # body rotation reward
+    diff_global_body_rot = torch_utils.quat_mul(ref_body_rot, torch_utils.quat_conjugate(body_rot))
+    diff_global_body_angle = torch_utils.quat_to_angle_axis(diff_global_body_rot)[0]
+    diff_global_body_angle_dist = (diff_global_body_angle**2).mean(dim=-1)
+    r_body_rot = torch.exp(-k_rot * diff_global_body_angle_dist)
+
+    # body linear velocity reward
+    diff_global_vel = ref_body_vel - body_vel
+    diff_global_vel_dist = (diff_global_vel**2).mean(dim=-1).mean(dim=-1)
+    r_vel = torch.exp(-k_vel * diff_global_vel_dist)
+
+    # body angular velocity reward
+    diff_global_ang_vel = ref_body_ang_vel - body_ang_vel
+    diff_global_ang_vel_dist = (diff_global_ang_vel**2).mean(dim=-1).mean(dim=-1)
+    r_ang_vel = torch.exp(-k_ang_vel * diff_global_ang_vel_dist)
+
+    reward = w_pos * r_body_pos + w_rot * r_body_rot + w_vel * r_vel + w_ang_vel * r_ang_vel
+    reward_raw = torch.stack([r_body_pos, r_body_rot, r_vel, r_ang_vel], dim=-1)
+    # import ipdb
+    # ipdb.set_trace()
+    return reward, reward_raw

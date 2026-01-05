@@ -522,16 +522,9 @@ class MotionLibBase():
             "motion_bodies": self._motion_bodies[motion_ids],
             # "motion_limb_weights": self._motion_limb_weights[motion_ids],
         }
-    
-        root_pos = results['root_pos']
-        root_rot = results['root_rot']
-        dof_pos = results['dof_pos']
-        root_vel = results['root_vel']
-        root_ang_vel = results['root_ang_vel']
-        dof_vel = results['dof_vel']
-        key_pos = results['key_pos']
 
-        return root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos
+        return results
+
 
     def get_root_pos_smpl(self, motion_ids, motion_times):
         n = len(motion_ids)

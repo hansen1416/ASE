@@ -249,8 +249,16 @@ class HumanoidAMP(Humanoid):
         else:
             assert(False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
 
+        motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-               = self._motion_lib.get_motion_state(motion_ids, motion_times)
+               = (motion_res["root_pos"],
+                motion_res["root_rot"],
+                motion_res["dof_pos"],
+                motion_res["root_vel"],
+                motion_res["root_ang_vel"],
+                motion_res["dof_vel"],
+                motion_res["key_pos"])
         
         # ---- 1211 --- enforce morphology-aware safe height on z ---
         safe_h = self._safe_root_heights[env_ids].unsqueeze(-1)  # [N, 1]
@@ -313,8 +321,18 @@ class HumanoidAMP(Humanoid):
 
         motion_ids = motion_ids.view(-1)
         motion_times = motion_times.view(-1)
+        
+        motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-               = self._motion_lib.get_motion_state(motion_ids, motion_times)
+               = (motion_res["root_pos"],
+                motion_res["root_rot"],
+                motion_res["dof_pos"],
+                motion_res["root_vel"],
+                motion_res["root_ang_vel"],
+                motion_res["dof_vel"],
+                motion_res["key_pos"])
+
         amp_obs_demo = build_amp_observations(root_pos, root_rot, root_vel, root_ang_vel, 
                                               dof_pos, dof_vel, key_pos, 
                                               self._local_root_obs, self._root_height_obs, 

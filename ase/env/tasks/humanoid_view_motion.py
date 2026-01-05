@@ -55,8 +55,16 @@ class HumanoidViewMotion(HumanoidAMP):
         motion_ids = self._motion_ids
         motion_times = self.progress_buf * self._motion_dt
 
+        motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
         root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-           = self._motion_lib.get_motion_state(motion_ids, motion_times)
+               = (motion_res["root_pos"],
+                motion_res["root_rot"],
+                motion_res["dof_pos"],
+                motion_res["root_vel"],
+                motion_res["root_ang_vel"],
+                motion_res["dof_vel"],
+                motion_res["key_pos"])
         
         root_vel = torch.zeros_like(root_vel)
         root_ang_vel = torch.zeros_like(root_ang_vel)
