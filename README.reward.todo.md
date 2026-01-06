@@ -12,24 +12,14 @@ PHC’s “goal-conditioned” observation (difference vectors in a heading-alig
 
 todo: Check compute_imitation_reward(...) in humanoid_im.py for the real logic. 4 terms
 
-col: we can just copy the entire function
+col: just copy the entire function, and use the motion res in post_physics_step instead. 
+do not need zero_out_far. focus on the pure imitation branch (i.e., always use compute_imitation_reward), 
+and treat “far from reference” as a termination / reset condition.
+_full_body_reward = True
 
-2. Training on thousands of sequences with one primitive
+check if the reward jumps when reset to motion frame
 
-We optimize (\pi_\theta) with PPO and train (D_\phi) concurrently using binary classification (reference vs rollout) on the discriminator input histories. To cover thousands of sequences effectively with a single policy, we use **clip-level sampling control** rather than multiple primitives:
 
-* **uniform sampling** for broad coverage early in training,
-* then **prioritized sampling** that increases the probability of clips with low recent tracking success (hard-example mining) while keeping a nonzero uniform mass to prevent mode collapse.
-
-This retains the simplicity of a single primitive while maintaining scalability across large and diverse motion corpora.
-
-todo: this should be start from a random frame in target motion. 
-
-3. Recovery Rewards; Cycle Consistency; Hard Resets. 
-
-todo: We only need Hard Resets
-
-col: check the reset logic in ASE
 
 5. AMP discriminator reward shaping (the “adversarial prior” reward)
 
@@ -80,6 +70,66 @@ plus any extra state your controller uses (e.g., PD targets).
 
 If you reset only poses but not velocities, the humanoid often “explodes/drifts” immediately; zero_out_far may then appear necessary, but it is compensating for a reset mismatch rather than solving imitation.
 
-8. do not need zero_out_far. You can focus on the pure imitation branch (i.e., always use compute_imitation_reward), and treat “far from reference” as a termination / reset condition.
+--
 
-_full_body_reward = True
+Hard Resets. 
+
+todo: We only need Hard Resets
+
+col: check the reset logic in ASE, it should be fine, right now we are doing hard reset. Ask gpt to confirm it.
+also, how to reset the velocity
+
+
+8. The neural network in PHC
+
+
+9. And your reward write-back is correct in the RL sense (reward must end up in self.rew_buf):, why is that?
+
+
+---------
+
+
+In case it didn't work out check list:
+
+Are body_pos/body_rot/... and ref_body_pos/ref_body_rot/... aligned over the same rigid-body ordering?
+If the motion library’s body order (and which bodies are included) differs from IsaacGym’s rigid_body_tensor order, the reward will be numerically “reasonable” but semantically wrong.
+
+A quick invariant test: if you reset the simulated pose exactly to the reference pose at time t, your imitation reward should jump close to the max (near the weighted sum of your terms).
+
+--
+
+How to use the reward:
+The contract is:
+
+Your env computes reward into self.rew_buf inside _compute_reward.
+
+The RL runner calls env.step(actions), and step() returns the reward buffer to the algorithm.
+
+PPO/A2C/etc. consumes that returned reward to compute returns/advantages and optimize the policy.
+
+This is explicitly how IsaacGymEnvs-style environments are designed: the RL algorithm calls step() “to retrieve the buffers it needs for training.” 
+NVIDIA Developer Forums
+
+(Modern Isaac Lab describes the same interface shape: step() returns observations, rewards, resets, and extras. 
+isaac-sim.github.io
+)
+
+--
+
+PHC commonly exposes diagnostics (e.g., per-term reward components) through self.extras[...] so the trainer/logger can record them.
+
+If you want PHC-like visibility in TensorBoard/W&B logs, add:
+
+# in post_physics_step(), after _compute_reward()
+self.extras["reward_raw"] = self.reward_raw.detach()
+self.extras["reward_total"] = self.rew_buf.detach()
+
+--
+
+Minimal checklist (so PPO actually receives your reward)
+
+self.rew_buf is shape (num_envs,), on the correct device, float32.
+
+You overwrite self.rew_buf[:] every step (not accumulate).
+
+reset_buf is set correctly (done flags), otherwise returns/episodes will be wrong even if rewards are right.

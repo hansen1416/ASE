@@ -76,6 +76,11 @@ class HumanoidPHC(Humanoid):
 
         self._compute_observations(task_obs=task_obs)
         self._compute_reward(ref_body_pos, ref_body_rot, ref_body_vel, ref_body_ang_vel)
+
+        # if self.cfg["env"].get("debug_reward", True):
+        #     local_env = 3
+        #     print(self.progress_buf[local_env], self.rew_buf[local_env], self.rew_buf[local_env])
+
         self._compute_reset()
         
         self.extras["terminate"] = self._terminate_buf
