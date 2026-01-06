@@ -1,23 +1,9 @@
 reward-plan:
 
-1. Main imitation tracking reward is `compute_imitation_reward(...)` in `humanoid_im.py`. It computes exponential kernels over body position / rotation / linear velocity / angular velocity tracking errors, then combines them with weights from rwd_specs.
+1. Migrated PHC `compute_imitation_reward` in `humanoid_im.py` to ASE, with zero_out_far = False; _full_body_reward = True.
+`compute_imitation_reward` has 4 terms: # body position reward; # body rotation reward; # body linear velocity reward; # body angular velocity reward
 
-In contrast, the `humanoid.py` in ASE, the default `compute_humanoid_reward(...)` is just a placeholder returning ones. If your HumanoidPHC doesn’t override reward, training will effectively ignore tracking.
-
-Also note: AMP’s discriminator reward is not in the env. It is computed in the agent:
-
-`AMPAgent._calc_disc_rewards(...)` turns discriminator logits into a shaped reward (via a sigmoid → -log(1-prob)), then scales it.
-
-PHC’s “goal-conditioned” observation (difference vectors in a heading-aligned local frame, optionally with futures/lookahead) is also in humanoid_im.py via functions like compute_imitation_observations_v2/v3/v9/... (they explicitly compute local-frame diffs using heading inverse rotation).
-
-todo: Check compute_imitation_reward(...) in humanoid_im.py for the real logic. 4 terms
-
-col: just copy the entire function, and use the motion res in post_physics_step instead. 
-do not need zero_out_far. focus on the pure imitation branch (i.e., always use compute_imitation_reward), 
-and treat “far from reference” as a termination / reset condition.
-_full_body_reward = True
-
-check if the reward jumps when reset to motion frame
+Verified the reward is maximum when reset the humanoid.
 
 
 
@@ -86,6 +72,72 @@ also, how to reset the velocity
 9. And your reward write-back is correct in the RL sense (reward must end up in self.rew_buf):, why is that?
 
 
+
+
+
+10. 
+Hyperparameter
+Value
+Context
+PPO Clip ($\epsilon$)
+0.2
+Standard for stable on-policy updates.6
+Learning Rate
+$5 \times 10^{-5}$
+Conservative rate to prevent PNN column divergence.13
+AMP Reward Scale
+2.0
+High enough to enforce "style" over "shortcuts".15
+Tracking Reward Scale
+10.0
+Primary signal for the imitation objective.8
+Batch Size
+2048
+Balanced for GPU memory and gradient stability.25
+PNN Hidden Layers
+
+
+High capacity for complex skeletal dynamics.4
+
+
+11. 
+
+`self.rnn_states` is **not** “PHC’s own neural network structure”; it is the **recurrent hidden-state container** that RL-Games passes between the agent and the policy network **only when the policy is RNN-based** (e.g., GRU/LSTM).
+
+### Why does it exist / what does it do?
+
+* In PHC’s `IMAmpAgent.get_action`, the agent passes `rnn_states` into the model and receives updated `rnn_states` back each step (PHC stores it in `self.states`, but the key is still `"rnn_states"`). 
+* PHC initializes these states via `model.get_default_rnn_state()` and allocates a `[num_layers, num_envs, hidden_dim]`-shaped tensor bank.
+* In `AMPAgent`, the RNN rollout path (`play_steps_rnn`) likewise updates `self.rnn_states` from `res_dict['rnn_states']` and resets them on episode termination.
+* If `self.is_rnn == False`, `rnn_states` is effectively unused (typically `None` or an empty structure), and nothing “recurrent” happens.
+
+So: **`self.rnn_states` exists because RL-Games supports recurrent policies**, and the agent must carry per-environment hidden state across timesteps. It does *not* imply PHC uses a fundamentally different “agent-owned” network.
+
+### Does PHC use custom network structure anyway?
+
+Yes—but that’s **orthogonal** to `rnn_states`. PHC’s AMP agent assumes a customized `a2c_network` API that includes discriminator-related heads/methods (e.g., `get_disc_logit_weights()`, discriminator logits in `res_dict`).
+That “custom structure” is part of **AMP (policy + discriminator)**, not specifically an RNN feature.
+
+### Should you migrate the network first?
+
+Depends on your goal:
+
+* **Training from scratch in ASE:** usually *no*. You can migrate agent logic first, as long as your ASE model already exposes the same AMP-specific outputs/methods (discriminator logits, etc.). The `rnn_states` plumbing only matters if you enable RNN in the config.
+
+* **Reusing PHC checkpoints / expecting identical behavior:** *yes*. Then you should migrate **network builder + exact model architecture + normalization modules** before expecting restores to work, because weight loading is shape/name sensitive (PHC even guards against mean/std shape mismatch on restore).
+
+### Practical takeaway
+
+Treat `rnn_states` as an **interface contract**:
+
+* If your ASE run is **non-recurrent**, keep it simple: `is_rnn: False`, ignore `rnn_states`.
+* If you enable **recurrent policies**, ensure you migrate the *RNN rollout path* (state init/reset, masks) consistently—then `rnn_states` becomes necessary. 
+
+
+
+
+
+
 ---------
 
 
@@ -124,7 +176,10 @@ If you want PHC-like visibility in TensorBoard/W&B logs, add:
 self.extras["reward_raw"] = self.reward_raw.detach()
 self.extras["reward_total"] = self.rew_buf.detach()
 
+
 --
+
+
 
 Minimal checklist (so PPO actually receives your reward)
 
@@ -133,3 +188,16 @@ self.rew_buf is shape (num_envs,), on the correct device, float32.
 You overwrite self.rew_buf[:] every step (not accumulate).
 
 reset_buf is set correctly (done flags), otherwise returns/episodes will be wrong even if rewards are right.
+
+9. where they combine the task reward and the amp reward 
+
+
+--
+
+4) Persist + restore “failure/termination history” to continue curriculum
+
+PHC’s restore() loads a saved “failed_*” artifact and calls something like motion_lib.update_sampling_prob(termination_history) to restore the sampling distribution / termination history across runs. 
+
+im_amp
+
+ASE AMPAgent has no such restore-extension.
