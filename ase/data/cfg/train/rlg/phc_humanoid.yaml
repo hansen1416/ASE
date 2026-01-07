@@ -89,3 +89,14 @@ params:
 
     task_reward_w: 0.0
     disc_reward_w: 1.0
+    phc_agent:
+      track_motion_stats: true
+      motion_stats_topk: 20
+      eval_enabled: true
+      eval_freq: 10
+      eval_num_episodes: 4096
+      eval_deterministic: true
+      norm_disc_reward: true
+      disc_reward_norm_scale: 0.5
+      disc_reward_norm_shift: 0.25
+      freeze_obs_rms_per_epoch: true
