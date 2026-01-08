@@ -6,6 +6,9 @@ reward-plan:
 Verified the reward is maximum when reset the humanoid.
 
 
+2. migrate `play_steps_rnn` from PHC to ASE
+
+
 
 5. AMP discriminator reward shaping (the “adversarial prior” reward)
 
