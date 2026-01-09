@@ -382,10 +382,11 @@ class HumanoidPHC(Humanoid):
         # ---- target motion observation ----
 
         # ---- 1211 --- enforce morphology-aware safe height on z ---
+        # todo: somehow keep it at a safe height.
         safe_h = self._safe_root_heights[env_ids].unsqueeze(-1)  # [N, 1]
         z = root_pos[:, 2:3]
         root_pos = root_pos.clone()
-        root_pos[:, 2:3] = torch.maximum(z, safe_h)
+        # root_pos[:, 2:3] = torch.maximum(z, safe_h)
         # -------------------------------------------------
 
         # set env actor state
@@ -410,6 +411,18 @@ class HumanoidPHC(Humanoid):
         return
 
     def _reset_env_tensors(self, env_ids):
+
+        # # root: overwrite vel
+        # self._humanoid_root_states[env_ids, 7:10]  = 0.0  # or root_vel
+        # self._humanoid_root_states[env_ids, 10:13] = 0.0  # or root_ang_vel
+
+        # # dof: overwrite vel
+        # self._dof_vel[env_ids, :] = 0.0  # or dof_vel
+
+        # print(self._humanoid_root_states[env_ids, 7:10])
+        # print(self._humanoid_root_states[env_ids, 10:13])
+        # print("=================================")
+
         env_ids_int32 = self._humanoid_actor_ids[env_ids]
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self._root_states),

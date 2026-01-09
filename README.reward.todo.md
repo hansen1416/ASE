@@ -5,54 +5,18 @@ reward-plan:
 
 Verified the reward is maximum when reset the humanoid.
 
+2. check the _reset_ref_state_init and _set_env_state, that should be logic where PHC reset the humanoid to the initial pose of target motion.
+, need to adjust the height
 
+3. ask if PHC used rnn, also check the code.
 
+4. target motion multiple shape adpaption.
 
-5. AMP discriminator reward shaping (the “adversarial prior” reward)
-
-Where: phc/learning/amp_agent.py 
-DeepWiki
-
-What it does: Produces an auxiliary reward from a discriminator that distinguishes agent motion vs reference/demo motion (AMP).
-
-todo: check the phc repo for realted logic
-
-6. 3) How rewards are consumed by RL (returns/advantages, PPO losses)
-
-Where: phc/learning/common_agent.py 
-DeepWiki
-
-What it does: Implements PPO-style learning machinery that consumes per-step rewards to compute:
-
-Returns / value targets
-
-GAE advantages
-
-Policy/value losses with clipping
-
-DeepWiki explicitly frames PHC as PPO-on-A2C with GAE and clipping. 
-DeepWiki
-
-Even though this file isn’t a “reward function,” it is where reward signals become gradients.
-
-todo: check the phc repo for realted logic
-
-
-7. Imitation training + evaluation plumbing (reward-adjacent)
-
-Where: phc/learning/im_amp.py 
-DeepWiki
-
-What it does: Handles imitation-specific training/eval bookkeeping (success rate, MPJPE variants, velocity/acceleration errors). These metrics don’t define reward, but they are used to judge whether the reward shaping is producing the intended behavior.
-
-todo: check the phc repo for realted logic
 
 7. Random-frame reset only works well if you reset the simulator to a dynamically consistent state for that frame:
 
 root pose and joint pose,
-
 root linear/angular velocity and joint velocities,
-
 plus any extra state your controller uses (e.g., PD targets).
 
 If you reset only poses but not velocities, the humanoid often “explodes/drifts” immediately; zero_out_far may then appear necessary, but it is compensating for a reset mismatch rather than solving imitation.
@@ -61,7 +25,7 @@ If you reset only poses but not velocities, the humanoid often “explodes/drift
 
 Hard Resets. 
 
-todo: We only need Hard Resets
+todo: Maybe we should make sure the reset also handle the velocity
 
 col: check the reset logic in ASE, it should be fine, right now we are doing hard reset. Ask gpt to confirm it.
 also, how to reset the velocity
@@ -71,9 +35,6 @@ also, how to reset the velocity
 
 
 9. And your reward write-back is correct in the RL sense (reward must end up in self.rew_buf):, why is that?
-
-
-
 
 
 10. 
