@@ -331,7 +331,6 @@ class HumanoidPHC(Humanoid):
 
             truncate_time = self.dt * (self._num_amp_obs_steps - 1)
             motion_times = self._motion_lib.sample_time(self._sampled_motion_ids[env_ids], truncate_time=truncate_time)
-            # todo 
             motion_times = motion_times + truncate_time
 
             self._reset_ref_env_ids = env_ids
