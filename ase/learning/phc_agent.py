@@ -408,7 +408,6 @@ class PHCAgent(common_agent.CommonAgent):
             res_dict['values'] = self.value_mean_std(res_dict['values'], True)
         
         # Bernoulli per env: 1 => keep stochastic action, 0 => use deterministic mean action.
-        # TODO: IF WE JUST COPY, MAYBE NO stochastic action
         rand_action_mask = torch.bernoulli(rand_action_probs)
         det_action_mask = rand_action_mask == 0.0
         res_dict['actions'][det_action_mask] = res_dict['mus'][det_action_mask]
@@ -965,7 +964,6 @@ class PHCAgent(common_agent.CommonAgent):
     
     def _calc_advs(self, batch_dict):
         """
-        (TODO: what is advantage?)
         Compute advantages with masking for eps-greedy.
 
         Here, advantages are computed as returns - values and then optionally normalized
