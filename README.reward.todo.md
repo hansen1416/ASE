@@ -12,6 +12,8 @@ Verified the reward is maximum when reset the humanoid.
 
 4. target motion multiple shape adpaption.
 
+5. chekc all the AMASS dataset with different body shapes, how to make sure there is no penetration at the start?
+
 
 7. Random-frame reset only works well if you reset the simulator to a dynamically consistent state for that frame:
 

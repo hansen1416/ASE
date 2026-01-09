@@ -331,6 +331,7 @@ class HumanoidPHC(Humanoid):
 
             truncate_time = self.dt * (self._num_amp_obs_steps - 1)
             motion_times = self._motion_lib.sample_time(self._sampled_motion_ids[env_ids], truncate_time=truncate_time)
+            # todo 
             motion_times = motion_times + truncate_time
 
             self._reset_ref_env_ids = env_ids
@@ -382,10 +383,9 @@ class HumanoidPHC(Humanoid):
         # ---- target motion observation ----
 
         # ---- 1211 --- enforce morphology-aware safe height on z ---
-        # todo: somehow keep it at a safe height.
-        safe_h = self._safe_root_heights[env_ids].unsqueeze(-1)  # [N, 1]
-        z = root_pos[:, 2:3]
-        root_pos = root_pos.clone()
+        # safe_h = self._safe_root_heights[env_ids].unsqueeze(-1)  # [N, 1]
+        # z = root_pos[:, 2:3]
+        # root_pos = root_pos.clone()
         # root_pos[:, 2:3] = torch.maximum(z, safe_h)
         # -------------------------------------------------
 

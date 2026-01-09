@@ -390,7 +390,7 @@ class Humanoid(BaseTask):
         # ---- 1211 actions new: morphology-aware root heights ---
         self._base_char_height = self.cfg["env"].get("base_char_height", 0.89)
         self._spawn_height_margin = self.cfg["env"].get("spawn_height_margin", 0.05)
-        self._safe_root_heights = torch.zeros(self.num_envs, device=self.device)
+        # self._safe_root_heights = torch.zeros(self.num_envs, device=self.device)
         # ---- 1211 actions ------------------------------------------
         
         for i in range(self.num_envs):
@@ -409,7 +409,7 @@ class Humanoid(BaseTask):
 
             # ---- 1211 actions new: cache a safe spawn height for this env ---
             # todo we need do this more percisely, findout the exact height for each humanoid
-            self._safe_root_heights[i] = self._compute_safe_root_height(template_id)
+            # self._safe_root_heights[i] = self._compute_safe_root_height(template_id)
             # ---------------------------------------------------
 
             self._build_env(i, env_ptr, h_asset)
@@ -449,15 +449,15 @@ class Humanoid(BaseTask):
         segmentation_id = 0
 
         start_pose = gymapi.Transform()
-        # char_h = 0.89
+        char_h = 0.9
 
         # ---- 1211 morphology-aware spawn height ---
-        char_h = float(self._safe_root_heights[env_id]) + 0.1
+        # char_h = float(self._safe_root_heights[env_id]) + 0.1
         # --------------------------------------
 
         start_pose.p = gymapi.Vec3(*get_axis_params(char_h, self.up_axis_idx))
         start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
-
+        # this should take no effect at reset actors, we are using the motion root_pos
         humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "humanoid", col_group, col_filter, segmentation_id)
 
         # fetures plugin -------------
