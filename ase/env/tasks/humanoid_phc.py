@@ -533,6 +533,7 @@ class HumanoidPHC(Humanoid):
 
         # anchor into env
         offset = self._global_offset[env_ids].unsqueeze(1)
+        # motion_res["key_pos"].shape is [num_envs, the number of key bodies, 3]
         ref_pos = motion_res["key_pos"] + offset
         ref_vel = ( motion_res_next["key_pos"] - motion_res["key_pos"]) / self.dt
 
