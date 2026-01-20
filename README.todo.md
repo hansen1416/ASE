@@ -1,8 +1,21 @@
+- Review PACER Project
 
-- todo we need do calculate the safe height more percisely, findout the exact height for each humanoid
+    Revisit the PACER paper to clarify its differences from your approach.
+    Focus on how PACER incorporates shape conditioning.
 
 
-- apply multi shapes loading to target motion loading
+- [Observation] Concatenate SMPL shape parameters (β) into the AMP observation space.
+
+- [Reward] Redesign the reward function to use joint rotations rather than absolute joint positions.
+
+- [Initialization] Modify the humanoid initialization logic to align joint rotations only (ignore absolute positions).
+
+
+- todo we need do calculate the safe height more percisely, findout the exact height for each humanoid. This is become more tricky since we are useing single shape as target motion.
+
+- use humos to predict motions for each body shape
+
+- find out a metric/stadard to filter the humos generated motions
 
 - And your reward write-back is correct in the RL sense (reward must end up in self.rew_buf):, why is that?
 
