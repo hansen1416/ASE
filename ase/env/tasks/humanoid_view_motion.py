@@ -2,10 +2,10 @@ import torch
 
 from isaacgym import gymtorch
 
-from env.tasks.humanoid_amp import HumanoidAMP
+from env.tasks.humanoid_phc import HumanoidPHC
 
 
-class HumanoidViewMotion(HumanoidAMP):
+class HumanoidViewMotion(HumanoidPHC):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         """
         HumanoidViewMotion does not use physics-based joint torques. `cfg["env"]["pdControl"] = False`,
@@ -71,7 +71,7 @@ class HumanoidViewMotion(HumanoidAMP):
         dof_vel = torch.zeros_like(dof_vel)
 
         env_ids = torch.arange(self.num_envs, dtype=torch.long, device=self.device)
-        self._set_env_state(env_ids=env_ids, 
+        self._reset_actors(env_ids=env_ids, 
                             root_pos=root_pos, 
                             root_rot=root_rot, 
                             dof_pos=dof_pos, 
@@ -93,8 +93,8 @@ class HumanoidViewMotion(HumanoidAMP):
         self.reset_buf[:], self._terminate_buf[:] = compute_view_motion_reset(self.reset_buf, motion_lengths, self.progress_buf, self._motion_dt)
         return
 
-    def _reset_actors(self, env_ids):
-        return
+    # def _reset_actors(self, env_ids):
+    #     return
 
     def _reset_env_tensors(self, env_ids):
         num_motions = self._motion_lib.num_motions()
