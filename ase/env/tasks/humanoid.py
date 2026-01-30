@@ -55,8 +55,14 @@ class Humanoid(BaseTask):
         self.cfg["device_id"] = device_id
         self.cfg["headless"] = headless
 
+        if not hasattr(self, "target_marker_enabled"):
+            self.target_marker_enabled = True
+
+        if not hasattr(self, "follow_camera_enabled"):
+            self.follow_camera_enabled = True
+
         # fetures plugin -------------
-        self._features = [TargetMarkerFeature(enabled=True), FollowCameraFeature(enabled=True)]
+        self._features = [TargetMarkerFeature(enabled=self.target_marker_enabled), FollowCameraFeature(enabled=self.follow_camera_enabled)]
         # fetures plugin -------------
          
         super().__init__(cfg=self.cfg)
