@@ -1,3 +1,5 @@
+- When sampling the motions, we need to consider the beta/shape of the humanoid model, and we can do sanity check when we call `motion_lib.get_motion_state(motion_ids, motion_times)`, see if it returns the same beta/shape as current humaoid model.
+
 - Review PACER Project
 
     Revisit the PACER paper to clarify its differences from your approach.
@@ -71,6 +73,24 @@
     root pose and joint pose,
     root linear/angular velocity and joint velocities,
     plus any extra state your controller uses (e.g., PD targets).
+
+
+
+- Certainly! Here’s a markdown-style summary:
+
+- **Align Motion and Agent**: Ensure each agent’s body shape and gender match the motion data.
+
+- **Observation Space**: Include the agent’s morphology (e.g., body shape) but avoid redundant motion attributes.
+
+- **Reward Function**: Combine accurate tracking, naturalness (adversarial term), and efficiency (control penalty).
+
+- **Network Architecture**: Use FiLM-like conditioning on body shape to adapt the network.
+
+- **RL Algorithm**: Select a stable, existing RL method suited for parallel agents.
+
+- **Integration**: Combine observation, reward, network, and algorithm into a coherent pipeline.
+
+- **Iteration and Refinement**: Adjust based on shape diversity and performance outcomes.
 
 
 
