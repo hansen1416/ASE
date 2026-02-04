@@ -147,6 +147,8 @@ class MotionLibBase():
             else:
                 data_list = self._motion_data_load
 
+            # dict_keys(['0-ACCAD_Female1Running_c3d_C4 - Run to walk1_poses'])
+            # dict_keys(['pose_quat_global', 'pose_quat', 'trans_orig', 'root_trans_offset', 'beta', 'gender', 'pose_aa', 'fps'])
             self._motion_data_list = np.array(list(data_list.values()))
             self._motion_data_keys = np.array(list(data_list.keys()))
         else:

@@ -24,7 +24,11 @@ motion_file = os.path.join(project_dir, "data/motions/0-ACCAD_Female1Running_c3d
 
 # _dof_body_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 # _dof_offsets = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69]
-_key_body_ids = torch.tensor([ 7,  3, 22, 17], device=device)
+# _key_body_ids = torch.tensor([ 7,  3, 22, 17], device=device)
+
+# in phc setting, we have 24 keypoints, maybe for humos training, we reduce to 22, exclude hands.
+_key_body_ids = torch.tensor([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17,
+        18, 19, 20, 21, 22, 23], device=device)
 
 asset_file = os.path.join(project_dir, "./data/assets/mjcf/smpl_humanoid.xml")
 
@@ -75,10 +79,17 @@ root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
         motion_res["dof_vel"],
         motion_res["key_pos"])
 
+# root_pos torch.Size([1, 3])
 print("root_pos", root_pos.shape)
+# root_rot torch.Size([1, 4])
 print("root_rot", root_rot.shape)
+# dof_pos torch.Size([1, 69])
 print("dof_pos", dof_pos.shape)
+# root_vel torch.Size([1, 3])
 print("root_vel", root_vel.shape)
+# root_ang_vel torch.Size([1, 3])
 print("root_ang_vel", root_ang_vel.shape)
+# dof_vel torch.Size([1, 69])
 print("dof_vel", dof_vel.shape)
+# key_pos torch.Size([1, 24, 3])
 print("key_pos", key_pos.shape)
