@@ -40,10 +40,26 @@ motion_lib_cfg = EasyDict({
             "key_body_ids": _key_body_ids
         })
 
-motion_lib = MotionLibHUMOS(motion_lib_cfg=motion_lib_cfg)
+motion_lib = MotionLibHUMOS(cfg=motion_lib_cfg)
 
-motion = motion_lib.load_motions()
+motion_lib.load_motions()
 
+# print(motion_lib.num_motions())
+# print(motion_lib.get_motion_length(0))
+
+motion_ids = motion_lib.sample_motions(1)
+
+print(motion_ids)
+
+# motion_times = motion_lib.sample_time(motion_ids)
+
+# print(motion_times)
+
+motion_times = torch.tensor([0.0], device='cuda:0')
+
+motion_res = motion_lib.get_motion_state(motion_ids, motion_times)
+
+print(motion_res)
 
 # motion_lib.load_motions(skeleton_trees=[sk_tree], 
 #                         gender_betas=humanoid_shapes.cpu(), 
