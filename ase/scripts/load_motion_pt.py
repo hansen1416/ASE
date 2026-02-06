@@ -59,40 +59,27 @@ motion_times = torch.tensor([0.0], device='cuda:0')
 
 motion_res = motion_lib.get_motion_state(motion_ids, motion_times)
 
-print(motion_res)
+root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
+        = (motion_res["root_pos"],
+        motion_res["root_rot"],
+        motion_res["dof_pos"],
+        motion_res["root_vel"],
+        motion_res["root_ang_vel"],
+        motion_res["dof_vel"],
+        motion_res["key_pos"])
 
-# motion_lib.load_motions(skeleton_trees=[sk_tree], 
-#                         gender_betas=humanoid_shapes.cpu(), 
-#                         random_sample=True)
+# root_pos torch.Size([1, 3])
+print("root_pos", root_pos.shape)
+# root_rot torch.Size([1, 4])
+print("root_rot", root_rot.shape)
+# dof_pos torch.Size([1, 69])
+print("dof_pos", dof_pos.shape)
+# root_vel torch.Size([1, 3])
+print("root_vel", root_vel.shape)
+# root_ang_vel torch.Size([1, 3])
+print("root_ang_vel", root_ang_vel.shape)
+# dof_vel torch.Size([1, 69])
+print("dof_vel", dof_vel.shape)
+# key_pos torch.Size([1, 24, 3])
+print("key_pos", key_pos.shape)
 
-# # tensor([0], device='cuda:0')
-# motion_ids = motion_lib.sample_motions(num_envs)
-# # tensor([2.9572], device='cuda:0')
-# motion_times = motion_lib.sample_time(motion_ids, truncate_time=0.0)
-
-# motion_res = motion_lib.get_motion_state(motion_ids, motion_times)
-
-# root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-#         = (motion_res["root_pos"],
-#         motion_res["root_rot"],
-#         motion_res["dof_pos"],
-#         motion_res["root_vel"],
-#         motion_res["root_ang_vel"],
-#         motion_res["dof_vel"],
-#         motion_res["key_pos"])
-
-
-# # root_pos torch.Size([1, 3])
-# print("root_pos", root_pos.shape)
-# # root_rot torch.Size([1, 4])
-# print("root_rot", root_rot.shape)
-# # dof_pos torch.Size([1, 69])
-# print("dof_pos", dof_pos.shape)
-# # root_vel torch.Size([1, 3])
-# print("root_vel", root_vel.shape)
-# # root_ang_vel torch.Size([1, 3])
-# print("root_ang_vel", root_ang_vel.shape)
-# # dof_vel torch.Size([1, 69])
-# print("dof_vel", dof_vel.shape)
-# # key_pos torch.Size([1, 24, 3])
-# print("key_pos", key_pos.shape)

@@ -189,43 +189,26 @@ class MotionLibHUMOS():
 
     def get_motion_state(self, motion_ids, motion_times, gender="male", beta_key="0a1ece18"):
         """
-        Returns interpolated motion state for the given motion_ids and times.
-        Selects the specific gender + beta_key variant for each motion_key.
-
-        Args:
-            motion_ids:     torch.LongTensor [B], indices into self.motion_keys
-            motion_times:   torch.Tensor [B], time in seconds
-            gender:         str, one of "male", "neutral", "female"
-            beta_key:       str, e.g. "0a1ece18"  (same for all envs in this call)
-
-        Returns:
-            dict with keys:
-                "root_pos"      [B, 3]
-                "root_rot"      [B, 4]     (quaternion)
-                "dof_pos"       [B, 69]    (usually root 6 + body 63)
-                "root_vel"      [B, 3]
-                "root_ang_vel"  [B, 3]
-                "dof_vel"       [B, 69]
-                "key_pos"       [B, 24, 3]   global joint positions
+        Returns interpolated motion state matching ASE-style keys/shapes.
+        Uses the real HUMOS format: pose_body [T, 23, 3], joints_pos [T, 24, 3], etc.
         """
         B = motion_ids.shape[0]
         device = self.device
 
-        # Prepare output tensors
-        root_pos     = torch.zeros(B, 3,      device=device)
-        root_rot     = torch.zeros(B, 4,      device=device)  # quat
-        dof_pos      = torch.zeros(B, 69,     device=device)
-        root_vel     = torch.zeros(B, 3,      device=device)
-        root_ang_vel = torch.zeros(B, 3,      device=device)
-        dof_vel      = torch.zeros(B, 69,     device=device)
-        key_pos      = torch.zeros(B, 24, 3,  device=device)
+        root_pos     = torch.zeros(B, 3,       device=device)
+        root_rot     = torch.zeros(B, 4,       device=device)  # quat
+        dof_pos      = torch.zeros(B, 69,      device=device)  # body 23×3 = 69
+        root_vel     = torch.zeros(B, 3,       device=device)
+        root_ang_vel = torch.zeros(B, 3,       device=device)
+        dof_vel      = torch.zeros(B, 69,      device=device)  # we'll use stored dof_vel
+        key_pos      = torch.zeros(B, 24, 3,   device=device)
 
         for i in range(B):
             mid = motion_ids[i].item()
             motion_key = self.motion_keys[mid]
-            t = motion_times[i].item()
+            t_sec = motion_times[i].item()
 
-            # Find the flat_motion that matches motion_key + gender + beta_key
+            # Find matching variant
             found = False
             flat_motion = None
             for j, meta in enumerate(self.motion_metadata):
@@ -236,8 +219,7 @@ class MotionLibHUMOS():
                     break
 
             if not found:
-                print(f"Warning: variant not found for {motion_key} / {gender} / {beta_key} → using first available")
-                # Fallback: use the first one for this motion_key
+                # Fallback to first variant of this motion_key
                 for j, meta in enumerate(self.motion_metadata):
                     mk, _, _ = meta
                     if mk == motion_key:
@@ -246,15 +228,17 @@ class MotionLibHUMOS():
                 if flat_motion is None:
                     continue
 
-            # Get data
-            trans       = flat_motion["trans"]        # [T, 3]
-            root_orient = flat_motion.get("root_orient")   # [T, 3] or None
-            pose_body   = flat_motion["pose_body"]    # [T, 63]
-            joints_pos  = flat_motion.get("joints_pos")    # [T, 24, 3] or None
+            # Extract tensors
+            trans       = flat_motion["trans"]          # [T, 3]
+            root_orient = flat_motion.get("root_orient")     # [T, 3]
+            pose_body   = flat_motion["pose_body"]      # [T, 23, 3]
+            joints_pos  = flat_motion.get("joints_pos")      # [T, 24, 3]
+            root_vel_t  = flat_motion.get("root_vel")        # [T, 3]
+            root_ang_vel_t = flat_motion.get("root_ang_vel") # [T, 3]
+            dof_vel_t   = flat_motion.get("dof_vel")         # [T, 23, 3]
 
-            num_frames = trans.shape[0]
-            if num_frames < 2:
-                # degenerate case
+            T = trans.shape[0]
+            if T < 2:
                 root_pos[i] = trans[0]
                 if joints_pos is not None:
                     key_pos[i] = joints_pos[0]
@@ -262,46 +246,53 @@ class MotionLibHUMOS():
                     root_rot[i] = torch_utils.axis_angle_to_quaternion(root_orient[0])
                 continue
 
-            # Compute frame indices and blend factor
-            frame_float = t / self.dt
-            f0 = int(frame_float)
-            f1 = min(f0 + 1, num_frames - 1)
-            alpha = frame_float - f0
+            # Frame blending
+            frame_f = t_sec * self.fps
+            f0 = int(frame_f)
+            f1 = min(f0 + 1, T - 1)
+            alpha = frame_f - f0
             alpha = max(0.0, min(1.0, alpha))
 
-            # Interpolate
+            # Root position (translation)
             root_pos[i] = (1 - alpha) * trans[f0] + alpha * trans[f1]
 
+            # Root rotation (axis-angle → quat)
             if root_orient is not None:
                 ro0 = root_orient[f0]
                 ro1 = root_orient[f1]
                 ro_interp = (1 - alpha) * ro0 + alpha * ro1
                 root_rot[i] = torch_utils.axis_angle_to_quaternion(ro_interp)
             else:
-                root_rot[i] = torch.tensor([0., 0., 0., 1.], device=device)  # identity
+                root_rot[i] = torch.tensor([0., 0., 0., 1.], device=device)
 
-            # dof_pos: classic ASE often uses root 6DoF (exp map 3 + trans? but usually just body)
-            # Here we do simple concatenation: assume 69 = 6 (root) + 63 (body)
-            # But HUMOS doesn't have root translation in dof → we fake simple version
-            pb0 = pose_body[f0]   # [63]
+            # DoF position: body joints only (23 × 3 = 69)
+            pb0 = pose_body[f0]     # [23, 3]
             pb1 = pose_body[f1]
             pb_interp = (1 - alpha) * pb0 + alpha * pb1
+            dof_pos[i] = pb_interp.reshape(-1)   # → [69]
 
-            # For now: pad with zeros for root 6DoF (common hack for SMPL-based)
-            dof_pos[i, :6]  = 0.0
-            dof_pos[i, 6:]   = pb_interp   # 63 values
-
-            # key_pos = joints_pos (most useful for visualization / feet contact)
+            # Key positions (global joint locations)
             if joints_pos is not None:
                 jp0 = joints_pos[f0]
                 jp1 = joints_pos[f1]
                 key_pos[i] = (1 - alpha) * jp0 + alpha * jp1
-            else:
-                # fallback: just repeat root pos (very approximate)
-                key_pos[i] = root_pos[i].unsqueeze(0).expand(24, 3)
 
-            # Velocities → placeholder (zero for now)
-            # Later: can compute finite difference if needed
+            # Velocities — use precomputed if available
+            if root_vel_t is not None:
+                rv0 = root_vel_t[f0]
+                rv1 = root_vel_t[f1]
+                root_vel[i] = (1 - alpha) * rv0 + alpha * rv1
+
+            if root_ang_vel_t is not None:
+                ra0 = root_ang_vel_t[f0]
+                ra1 = root_ang_vel_t[f1]
+                root_ang_vel[i] = (1 - alpha) * ra0 + alpha * ra1
+
+            if dof_vel_t is not None:
+                dv0 = dof_vel_t[f0]     # [23, 3]
+                dv1 = dof_vel_t[f1]
+                dv_interp = (1 - alpha) * dv0 + alpha * dv1
+                dof_vel[i] = dv_interp.reshape(-1)   # → [69]
 
         return {
             "root_pos":     root_pos,
