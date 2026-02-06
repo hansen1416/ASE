@@ -1,3 +1,19 @@
+- apply the height offset!
+
+
+
+* Your pose data contains joint rotations (degrees of freedom pose) and their temporal derivatives (degrees of freedom velocity).
+* Given the frame rate and root position/orientation, the full motion trajectory can be reconstructed.
+* Interpolation is required only when frame gaps are large or the frame rate is low.
+* These degrees of freedom parameters are the fundamental control signals for humanoid simulation.
+* With these components, the motion pipeline can be calculated and integrated in a straightforward manner.
+
+in motion_lib_base, _calc_frame_blend calculate the blend, and _local_rotation_to_dof_smpl calculate the dof_pos
+
+
+- migrate the humos motion load logic, we can use brand bew load motion logic, just in `get_motion_state`, besides motion_ids, motion_times, it also have to pass betas and gender.
+
+
 - When sampling the motions, we need to consider the beta/shape of the humanoid model, and we can do sanity check when we call `motion_lib.get_motion_state(motion_ids, motion_times)`, see if it returns the same beta/shape as current humaoid model.
 
 - Review PACER Project
@@ -113,4 +129,3 @@ This is explicitly how IsaacGymEnvs-style environments are designed: the RL algo
 NVIDIA Developer Forums:
 (Modern Isaac Lab describes the same interface shape: step() returns observations, rewards, resets, and extras. 
 isaac-sim.github.io)
-
