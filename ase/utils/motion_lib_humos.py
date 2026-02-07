@@ -44,12 +44,20 @@ class MotionLibHUMOS():
         self.motion_key_to_length = {}     # str → float
         self.motion_key_to_index = {k: i for i, k in enumerate(self.motion_keys)}
 
+        self._variant_idx = {}          # (motion_key, gender, beta_key) -> int (index into self.motions)
+
     def num_motions(self) -> int:
         return len(self.motion_keys)
 
     def get_motion_length(self, idx: int) -> float:
         """Length in seconds for motion at index idx"""
         return self.motion_lengths[idx]
+    
+    def _variant_id(self, motion_key: str, gender: str, beta_key: str) -> int:
+        try:
+            return self._variant_idx[(motion_key, gender, beta_key)]
+        except KeyError as e:
+            raise KeyError(f"Variant not found: {(motion_key, gender, beta_key)}") from e
 
     def load_motions(self):
         """
@@ -119,6 +127,13 @@ class MotionLibHUMOS():
                             "offset_height":seq_dict.get("offset_height", 0.0),
                             # add more keys if present (root_vel, etc.)
                         }
+
+                        variant_id = len(self.motions)
+                        key = (motion_key, gender_group, beta_key)
+                        if key in self._variant_idx:
+                            raise RuntimeError(f"Duplicate variant key: {key}")
+
+                        self._variant_idx[key] = variant_id
                         
                         # Optional: move gender info if needed
                         flat_motion["gender_group"] = gender_group
@@ -206,8 +221,8 @@ class MotionLibHUMOS():
         rg_pos = torch.zeros(B, 24, 3,   device=device)
         rb_rot = torch.zeros(B, 24, 4,   device=device)
 
-        body_vel = torch.zeros([1, 24, 3], device=self.device)
-        body_ang_vel = torch.zeros([1, 24, 3], device=self.device)
+        body_vel = torch.zeros([B, 24, 3], device=self.device)
+        body_ang_vel = torch.zeros([B, 24, 3], device=self.device)
 
         for i in range(B):
             mid = motion_ids[i].item()
@@ -215,24 +230,9 @@ class MotionLibHUMOS():
             t_sec = motion_times[i].item()
 
             # Find matching variant
-            found = False
-            flat_motion = None
-            for j, meta in enumerate(self.motion_metadata):
-                mk, g, bk = meta
-                if mk == motion_key and g == gender and bk == beta_key:
-                    flat_motion = self.motions[j]
-                    found = True
-                    break
+            variant_id = self._variant_id(motion_key, gender, beta_key)
 
-            if not found:
-                # Fallback to first variant of this motion_key
-                for j, meta in enumerate(self.motion_metadata):
-                    mk, _, _ = meta
-                    if mk == motion_key:
-                        flat_motion = self.motions[j]
-                        break
-                if flat_motion is None:
-                    continue
+            flat_motion = self.motions[variant_id]
 
             # Extract tensors
             trans       = flat_motion["trans"]          # [T, 3]
