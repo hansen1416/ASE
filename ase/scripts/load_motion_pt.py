@@ -49,13 +49,7 @@ motion_lib.load_motions()
 
 motion_ids = motion_lib.sample_motions(1)
 
-print(motion_ids)
-
-# motion_times = motion_lib.sample_time(motion_ids)
-
-# print(motion_times)
-
-motion_times = torch.tensor([0.0], device='cuda:0')
+motion_times = motion_lib.sample_time(motion_ids)
 
 motion_res = motion_lib.get_motion_state(motion_ids, motion_times)
 

@@ -8,6 +8,7 @@ import random
 from tqdm import tqdm
 from easydict import EasyDict
 import utils.pytorch3d_transforms as torch_utils
+import utils.isaacgym_torch_utils as issac_utils
 
 from poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
 
@@ -37,11 +38,12 @@ class MotionLibHUMOS():
 
         # We'll store loaded data here
         self.motions = []                  # list of flat dicts (one per sequence/variant)
-        self.motion_lengths = []           # seconds
-        self.motion_num_frames = []        # frames
+
         self.motion_metadata = []          # for debugging: (motion_key, gender_group, beta_key)
         
-        self.motion_key_to_length = {}     # str → float
+        self.motion_key_num_frames = {}     # str → float
+        self.motion_key_to_length = {}     # str → int
+
         self.motion_key_to_index = {k: i for i, k in enumerate(self.motion_keys)}
 
         self._variant_idx = {}          # (motion_key, gender, beta_key) -> int (index into self.motions)
@@ -49,9 +51,13 @@ class MotionLibHUMOS():
     def num_motions(self) -> int:
         return len(self.motion_keys)
 
-    def get_motion_length(self, idx: int) -> float:
+    def get_motion_length(self, motion_key: str) -> float:
         """Length in seconds for motion at index idx"""
-        return self.motion_lengths[idx]
+        return self.motion_key_to_length[motion_key]
+    
+    def get_motion_frames(self, motion_key: str) -> int:
+        """Length in seconds for motion at index idx"""
+        return self.motion_key_num_frames[motion_key]
     
     def _variant_id(self, motion_key: str, gender: str, beta_key: str) -> int:
         try:
@@ -90,7 +96,7 @@ class MotionLibHUMOS():
                 continue
                 
             try:
-                data = torch.load(file_path, map_location="cpu")
+                data = torch.load(file_path, map_location=self.device)
                 
                 # data is dict with keys like "male", "neutral", "female", "text"
                 for gender_group, group_content in data.items():
@@ -115,6 +121,9 @@ class MotionLibHUMOS():
                         # Inside the beta_key loop, after computing length_sec
                         if motion_key not in self.motion_key_to_length:
                             self.motion_key_to_length[motion_key] = length_sec
+
+                        if motion_key not in self.motion_key_num_frames:
+                            self.motion_key_num_frames[motion_key] = num_frames
                         # or assert they are the same if you want to be strict
                         
                         # Store flat dict
@@ -133,14 +142,9 @@ class MotionLibHUMOS():
                         if key in self._variant_idx:
                             raise RuntimeError(f"Duplicate variant key: {key}")
 
-                        self._variant_idx[key] = variant_id
-                        
-                        # Optional: move gender info if needed
-                        flat_motion["gender_group"] = gender_group
+                        self._variant_idx[key] = variant_id 
                         
                         self.motions.append(flat_motion)
-                        self.motion_lengths.append(length_sec)
-                        self.motion_num_frames.append(num_frames)
                         self.motion_metadata.append((motion_key, gender_group, beta_key))
                         
                         print(f"  Loaded {motion_key}/{gender_group}/{beta_key}: {num_frames} frames, {length_sec:.2f}s")
@@ -151,13 +155,9 @@ class MotionLibHUMOS():
 
         if not self.motions:
             raise RuntimeError("No valid motion sequences were loaded!")
-
-        # Convert lengths to tensors
-        self.motion_lengths = torch.tensor(self.motion_lengths, dtype=torch.float32, device=self.device)
-        self.motion_num_frames = torch.tensor(self.motion_num_frames, dtype=torch.long, device=self.device)
         
         print(f"\nSuccessfully loaded {len(self.motions)} individual motion sequences")
-        print(f"Total duration: {self.motion_lengths.sum():.2f} seconds")
+        print(f"Total duration: {sum(self.motion_key_to_length.values()):.2f} seconds")
 
     def sample_motions(self, n: int) -> torch.Tensor:
         """
@@ -201,6 +201,19 @@ class MotionLibHUMOS():
         times = phases * effective_lengths
 
         return times
+    
+
+    def _calc_frame_blend(self, time, len, num_frames, dt):
+        time = time.clone()
+        phase = time / len
+        phase = torch.clip(phase, 0.0, 1.0)  # clip time to be within motion length.
+        time[time < 0] = 0
+
+        frame_idx0 = (phase * (num_frames - 1)).long()
+        frame_idx1 = torch.min(frame_idx0 + 1, num_frames - 1).long()
+        blend = torch.clip((time - frame_idx0 * dt) / dt, 0.0, 1.0) # clip blend to be within 0 and 1
+        
+        return frame_idx0, frame_idx1, blend
 
     def get_motion_state(self, motion_ids, motion_times, gender="male", beta_key="0a1ece18"):
         """
@@ -208,19 +221,30 @@ class MotionLibHUMOS():
         Uses the real HUMOS format: pose_body [T, 23, 3], joints_pos [T, 24, 3], etc.
         """
         B = motion_ids.shape[0]
-        device = self.device
 
-        root_pos     = torch.zeros(B, 3,       device=device)
-        root_rot     = torch.zeros(B, 4,       device=device)  # quat
-        dof_pos      = torch.zeros(B, 69,      device=device)  # body 23×3 = 69
-        root_vel     = torch.zeros(B, 3,       device=device)
-        root_ang_vel = torch.zeros(B, 3,       device=device)
-        dof_vel      = torch.zeros(B, 69,      device=device)  # we'll use stored dof_vel
-        key_pos      = torch.zeros(B, 24, 3,   device=device)
+        motion_lens = torch.zeros(B, device=self.device)
+        motion_frames = torch.zeros(B, device=self.device)
 
-        rg_pos = torch.zeros(B, 24, 3,   device=device)
-        rb_rot = torch.zeros(B, 24, 4,   device=device)
+        for i in range(B):
+            mid = motion_ids[i].item()
+            motion_key = self.motion_keys[mid]
 
+            motion_lens[i] = self.motion_key_to_length[motion_key]
+            motion_frames[i] = self.motion_key_num_frames[motion_key]
+
+
+        f0, f1, blend = self._calc_frame_blend(motion_times, motion_lens,  motion_frames, self.dt)
+
+        root_pos     = torch.zeros(B, 3,       device=self.device)
+        root_rot     = torch.zeros(B, 4,       device=self.device)  # quat
+        dof_pos      = torch.zeros(B, 69,      device=self.device)  # body 23×3 = 69
+        root_vel     = torch.zeros(B, 3,       device=self.device)
+        root_ang_vel = torch.zeros(B, 3,       device=self.device)
+        dof_vel      = torch.zeros(B, 69,      device=self.device)  # we'll use stored dof_vel
+        key_pos      = torch.zeros(B, 24, 3,   device=self.device)
+
+        rg_pos = torch.zeros(B, 24, 3,   device=self.device)
+        rb_rot = torch.zeros(B, 24, 4,   device=self.device)
         body_vel = torch.zeros([B, 24, 3], device=self.device)
         body_ang_vel = torch.zeros([B, 24, 3], device=self.device)
 
@@ -243,62 +267,39 @@ class MotionLibHUMOS():
             root_ang_vel_t = flat_motion.get("root_ang_vel") # [T, 3]
             dof_vel_t   = flat_motion.get("dof_vel")         # [T, 23, 3]
 
-            T = trans.shape[0]
-            if T < 2:
-                root_pos[i] = trans[0]
-                if joints_pos is not None:
-                    key_pos[i] = joints_pos[0]
-                if root_orient is not None:
-                    root_rot[i] = torch_utils.axis_angle_to_quaternion(root_orient[0])
-                continue
+            # todo, we need to do the interpolation.
+            p0 = trans[f0]          # [3]
+            p1 = trans[f1]          # [3]
+            trans_t = (1.0 - blend) * p0 + blend * p1
 
-            # Frame blending
-            frame_f = t_sec * self.fps
-            f0 = int(frame_f)
-            f1 = min(f0 + 1, T - 1)
-            alpha = frame_f - f0
-            alpha = max(0.0, min(1.0, alpha))
+            # root_orient: [T,3] axis-angle
+            aa0 = root_orient[f0]        # [3]
+            aa1 = root_orient[f1]        # [3]
 
-            # Root position (translation)
-            root_pos[i] = (1 - alpha) * trans[f0] + alpha * trans[f1]
+            q0 = torch_utils.axis_angle_to_quaternion(aa0.unsqueeze(0)).squeeze(0)  # [4]
+            q1 = torch_utils.axis_angle_to_quaternion(aa1.unsqueeze(0)).squeeze(0)  # [4]
+            q_root = issac_utils.slerp(q0, q1, torch.unsqueeze(blend, axis=-1))  # [4]
+            # root_rot = q_root
 
-            # Root rotation (axis-angle → quat)
-            if root_orient is not None:
-                ro0 = root_orient[f0]
-                ro1 = root_orient[f1]
-                ro_interp = (1 - alpha) * ro0 + alpha * ro1
-                root_rot[i] = torch_utils.axis_angle_to_quaternion(ro_interp)
-            else:
-                root_rot[i] = torch.tensor([0., 0., 0., 1.], device=device)
+            print(aa0)
+            print(q_root)
+            print(aa1)
+            exit()
 
-            # DoF position: body joints only (23 × 3 = 69)
-            pb0 = pose_body[f0]     # [23, 3]
-            pb1 = pose_body[f1]
-            pb_interp = (1 - alpha) * pb0 + alpha * pb1
-            dof_pos[i] = pb_interp.reshape(-1)   # → [69]
+            # pose_body: [T,23,3] axis-angle
+            pb0 = pose_body[f0]                      # [23,3]
+            pb1 = pose_body[f1]                      # [23,3]
 
-            # Key positions (global joint locations)
-            if joints_pos is not None:
-                jp0 = joints_pos[f0]
-                jp1 = joints_pos[f1]
-                key_pos[i] = (1 - alpha) * jp0 + alpha * jp1
+            q0 = torch_utils.exp_map_to_quat(pb0.reshape(-1,3)).reshape(23,4)  # [23,4]
+            q1 = torch_utils.exp_map_to_quat(pb1.reshape(-1,3)).reshape(23,4)  # [23,4]
 
-            # Velocities — use precomputed if available
-            if root_vel_t is not None:
-                rv0 = root_vel_t[f0]
-                rv1 = root_vel_t[f1]
-                root_vel[i] = (1 - alpha) * rv0 + alpha * rv1
+            blend_t = torch.full((23,1), blend, device=q0.device, dtype=q0.dtype)  # broadcast
+            qj = torch_utils.slerp(q0, q1, blend_t)                                 # [23,4]
 
-            if root_ang_vel_t is not None:
-                ra0 = root_ang_vel_t[f0]
-                ra1 = root_ang_vel_t[f1]
-                root_ang_vel[i] = (1 - alpha) * ra0 + alpha * ra1
+            pose_body_t = torch_utils.quat_to_exp_map(qj).reshape(23,3)             # back to axis-angle (exp-map)
+            # dof_pos = pose_body_t.reshape(-1)  # [69]
 
-            if dof_vel_t is not None:
-                dv0 = dof_vel_t[f0]     # [23, 3]
-                dv1 = dof_vel_t[f1]
-                dv_interp = (1 - alpha) * dv0 + alpha * dv1
-                dof_vel[i] = dv_interp.reshape(-1)   # → [69]
+
 
         return {
             "root_pos":     root_pos,
