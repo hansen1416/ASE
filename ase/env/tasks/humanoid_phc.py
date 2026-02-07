@@ -8,6 +8,7 @@ from isaacgym import gymtorch
 
 from env.tasks.humanoid import Humanoid, dof_to_obs
 from utils.motion_lib_smpl import MotionLibSMPL
+from utils.motion_lib_humos import MotionLibHUMOS
 from isaacgym.torch_utils import *
 from poselib.poselib.skeleton.skeleton3d import SkeletonTree
 from utils import torch_utils
@@ -216,39 +217,63 @@ class HumanoidPHC(Humanoid):
     def _load_motion(self, motion_file):
         assert(self._dof_offsets[-1] == self.num_dof)
 
-        # multi humanoid template change ===============
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+        # # multi humanoid template change ===============
+        # asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
-        # multi humanoid template change ===============
-        asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
-        sk_tree = SkeletonTree.from_mjcf(asset_file_full)
+        # # multi humanoid template change ===============
+        # asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
+        # sk_tree = SkeletonTree.from_mjcf(asset_file_full)
 
-        gender_beta = np.zeros(17)
-        num_envs = self.cfg["env"]["numEnvs"]
+        # gender_beta = np.zeros(17)
+        # num_envs = self.cfg["env"]["numEnvs"]
 
-        humanoid_shapes = torch.tensor(np.array([gender_beta] * num_envs)).float().to(self.device)
+        # humanoid_shapes = torch.tensor(np.array([gender_beta] * num_envs)).float().to(self.device)
+
+        # motion_lib_cfg = EasyDict({
+        #     "motion_file": motion_file,
+        #     "device": torch.device("cpu"),
+        #     "fix_height": 1,
+        #     "min_length": -1,
+        #     "max_length": -1,
+        #     "im_eval": True,
+        #     "multi_thread": False,
+        #     "smpl_type": "smpl",
+        #     "randomrize_heading": True,
+        #     "device": self.device,
+        #     "min_length": -1, 
+        #     "step_dt": 1/60,
+        #     "key_body_ids": self._key_body_ids
+        # })
+
+        # self._motion_lib = MotionLibSMPL(motion_lib_cfg=motion_lib_cfg)
+
+        # self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
+        #             gender_betas=humanoid_shapes.cpu(), 
+        #             random_sample=True)
+        
+        motion_dir = "/home/hlz/repos/humos/output"
+        motion_keys = ["000002"]
+        _key_body_ids = torch.tensor(range(24), device=self.device)
 
         motion_lib_cfg = EasyDict({
-            "motion_file": motion_file,
+            "motion_dir": motion_dir,
+            "motion_keys": motion_keys,
             "device": torch.device("cpu"),
-            "fix_height": 1,
             "min_length": -1,
             "max_length": -1,
             "im_eval": True,
             "multi_thread": False,
-            "smpl_type": "smpl",
+            "smpl_type": "smplh",
             "randomrize_heading": True,
             "device": self.device,
             "min_length": -1, 
             "step_dt": 1/60,
-            "key_body_ids": self._key_body_ids
+            "key_body_ids": _key_body_ids
         })
 
-        self._motion_lib = MotionLibSMPL(motion_lib_cfg=motion_lib_cfg)
+        self._motion_lib = MotionLibHUMOS(cfg=motion_lib_cfg)
 
-        self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
-                    gender_betas=humanoid_shapes.cpu(), 
-                    random_sample=True)
+        self._motion_lib.load_motions()
 
         return
     

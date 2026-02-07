@@ -83,3 +83,10 @@ print("dof_vel", dof_vel.shape)
 # key_pos torch.Size([1, 24, 3])
 print("key_pos", key_pos.shape)
 
+rg_pos, rb_rot, body_vel, body_ang_vel = motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
+
+
+print("rg_pos", rg_pos.shape)
+print("rb_rot", rb_rot.shape)
+print("body_vel", body_vel.shape)
+print("body_ang_vel", body_ang_vel.shape)

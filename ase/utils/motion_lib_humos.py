@@ -49,7 +49,7 @@ class MotionLibHUMOS():
 
     def get_motion_length(self, idx: int) -> float:
         """Length in seconds for motion at index idx"""
-        return float(self.motion_lengths[idx])
+        return self.motion_lengths[idx]
 
     def load_motions(self):
         """
@@ -203,6 +203,12 @@ class MotionLibHUMOS():
         dof_vel      = torch.zeros(B, 69,      device=device)  # we'll use stored dof_vel
         key_pos      = torch.zeros(B, 24, 3,   device=device)
 
+        rg_pos = torch.zeros(B, 24, 3,   device=device)
+        rb_rot = torch.zeros(B, 24, 4,   device=device)
+
+        body_vel = torch.zeros([1, 24, 3], device=self.device)
+        body_ang_vel = torch.zeros([1, 24, 3], device=self.device)
+
         for i in range(B):
             mid = motion_ids[i].item()
             motion_key = self.motion_keys[mid]
@@ -302,4 +308,10 @@ class MotionLibHUMOS():
             "root_ang_vel": root_ang_vel,
             "dof_vel":      dof_vel,
             "key_pos":      key_pos,
+
+            # Added to match MotionLibBase style
+            "rg_pos":       rg_pos,
+            "rb_rot":       rb_rot,
+            "body_vel":     body_vel,
+            "body_ang_vel": body_ang_vel,
         }
