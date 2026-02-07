@@ -50,8 +50,20 @@ class MotionLibHUMOS():
 
     def num_motions(self) -> int:
         return len(self.motion_keys)
+    
+    def get_motion_length(self, motion_ids: torch.tensor) -> torch.tensor:
 
-    def get_motion_length(self, motion_key: str) -> float:
+        motion_lens = torch.zeros(motion_ids.shape[0], device=self.device)
+
+        for i in range(motion_ids.shape[0]):
+            mid = motion_ids[i].item()
+            motion_key = self.motion_keys[mid]
+
+            motion_lens[i] = self.get_motion_length_by_key(motion_key)
+
+        return motion_lens
+
+    def get_motion_length_by_key(self, motion_key: str) -> float:
         """Length in seconds for motion at index idx"""
         return self.motion_key_to_length[motion_key]
     
@@ -266,45 +278,49 @@ class MotionLibHUMOS():
             root_vel_t  = flat_motion.get("root_vel")        # [T, 3]
             root_ang_vel_t = flat_motion.get("root_ang_vel") # [T, 3]
             dof_vel_t   = flat_motion.get("dof_vel")         # [T, 23, 3]
-
+    
             # todo, we need to do the interpolation.
             p0 = trans[f0]          # [3]
             p1 = trans[f1]          # [3]
-            trans_t = (1.0 - blend) * p0 + blend * p1
+            # trans_t = (1.0 - blend) * p0 + blend * p1
 
             # root_orient: [T,3] axis-angle
             aa0 = root_orient[f0]        # [3]
             aa1 = root_orient[f1]        # [3]
 
-            q0 = torch_utils.axis_angle_to_quaternion(aa0.unsqueeze(0)).squeeze(0)  # [4]
-            q1 = torch_utils.axis_angle_to_quaternion(aa1.unsqueeze(0)).squeeze(0)  # [4]
-            q_root = issac_utils.slerp(q0, q1, torch.unsqueeze(blend, axis=-1))  # [4]
-            # root_rot = q_root
+            q0 = torch_utils.axis_angle_to_quaternion(aa0)
 
-            print(aa0)
-            print(q_root)
-            print(aa1)
-            exit()
+            # q0 = torch_utils.axis_angle_to_quaternion(aa0.unsqueeze(0)).squeeze(0)  # [4]
+            # q1 = torch_utils.axis_angle_to_quaternion(aa1.unsqueeze(0)).squeeze(0)  # [4]
+            # q_root = issac_utils.slerp(q0, q1, torch.unsqueeze(blend, axis=-1))  # [4]
+            # # root_rot = q_root
+
+            # print(aa0)
+            # print(q_root)
+            # print(aa1)
+            # exit()
 
             # pose_body: [T,23,3] axis-angle
             pb0 = pose_body[f0]                      # [23,3]
             pb1 = pose_body[f1]                      # [23,3]
 
-            q0 = torch_utils.exp_map_to_quat(pb0.reshape(-1,3)).reshape(23,4)  # [23,4]
-            q1 = torch_utils.exp_map_to_quat(pb1.reshape(-1,3)).reshape(23,4)  # [23,4]
+            pb0 = pb0.reshape(pb0.shape[0], -1)
 
-            blend_t = torch.full((23,1), blend, device=q0.device, dtype=q0.dtype)  # broadcast
-            qj = torch_utils.slerp(q0, q1, blend_t)                                 # [23,4]
+            # q0 = torch_utils.exp_map_to_quat(pb0.reshape(-1,3)).reshape(23,4)  # [23,4]
+            # q1 = torch_utils.exp_map_to_quat(pb1.reshape(-1,3)).reshape(23,4)  # [23,4]
 
-            pose_body_t = torch_utils.quat_to_exp_map(qj).reshape(23,3)             # back to axis-angle (exp-map)
-            # dof_pos = pose_body_t.reshape(-1)  # [69]
+            # blend_t = torch.full((23,1), blend, device=q0.device, dtype=q0.dtype)  # broadcast
+            # qj = torch_utils.slerp(q0, q1, blend_t)                                 # [23,4]
+
+            # pose_body_t = torch_utils.quat_to_exp_map(qj).reshape(23,3)             # back to axis-angle (exp-map)
+            # # dof_pos = pose_body_t.reshape(-1)  # [69]
 
 
 
         return {
-            "root_pos":     root_pos,
-            "root_rot":     root_rot,
-            "dof_pos":      dof_pos,
+            "root_pos":     p0,
+            "root_rot":     q0,
+            "dof_pos":      pb0,
             "root_vel":     root_vel,
             "root_ang_vel": root_ang_vel,
             "dof_vel":      dof_vel,
