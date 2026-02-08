@@ -10,7 +10,7 @@ from easydict import EasyDict
 import utils.pytorch3d_transforms as torch_utils
 import utils.isaacgym_torch_utils as issac_utils
 
-from poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
+from poselib.poselib.skeleton.skeleton3d import SkeletonTree, SkeletonMotion, SkeletonState
 
 from utils.flags import flags
 from utils.motion_lib_base import MotionLibBase, MotionlibMode, compute_motion_dof_vels, FixHeightMode
@@ -98,6 +98,56 @@ class MotionLibHUMOS():
               possibly others like velocities if computed
 
         """
+
+        # asset_file_example = os.path.join(".", "ase/data/assets/mjcf/smpl/0a1ece18_smpl.xml")
+        # sk_tree = SkeletonTree.from_mjcf(asset_file_example)
+
+        # print("node_names:", sk_tree.node_names)
+        # # ['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Hand']
+
+        # # print("num_joints:", len(sk_tree.node_names))
+        # # print("parent_indices:", sk_tree.parent_indices)
+
+        # humos_results_joint_names = [
+        #     "pelvis","left_hip","right_hip","spine1","left_knee","right_knee","spine2",
+        #     "left_ankle","right_ankle","spine3","left_foot","right_foot","neck","left_collar",
+        #     "right_collar","head","left_shoulder","right_shoulder","left_elbow","right_elbow",
+        #     "left_wrist","right_wrist","left_hand","right_hand",
+        # ]
+
+        # print(humos_results_joint_names)
+
+        # exit()
+
+        # # HUMOS pose_body order (no pelvis): 23 joints
+        humos_body_names = [
+            "left_hip","right_hip","spine1","left_knee","right_knee","spine2",
+            "left_ankle","right_ankle","spine3","left_foot","right_foot","neck",
+            "left_collar","right_collar","head","left_shoulder","right_shoulder",
+            "left_elbow","right_elbow","left_wrist","right_wrist","left_hand","right_hand",
+        ]
+
+        # MJCF order excluding Pelvis: 23 joints
+        mjcf_body_names = [
+            "L_Hip","L_Knee","L_Ankle","L_Toe",
+            "R_Hip","R_Knee","R_Ankle","R_Toe",
+            "Torso","Spine","Chest","Neck","Head",
+            "L_Thorax","L_Shoulder","L_Elbow","L_Wrist","L_Hand",
+            "R_Thorax","R_Shoulder","R_Elbow","R_Wrist","R_Hand",
+        ]
+
+        mjcf_to_humos = {
+            "L_Hip":"left_hip", "L_Knee":"left_knee", "L_Ankle":"left_ankle", "L_Toe":"left_foot",
+            "R_Hip":"right_hip","R_Knee":"right_knee","R_Ankle":"right_ankle","R_Toe":"right_foot",
+            "Torso":"spine1","Spine":"spine2","Chest":"spine3",
+            "Neck":"neck","Head":"head",
+            "L_Thorax":"left_collar","L_Shoulder":"left_shoulder","L_Elbow":"left_elbow","L_Wrist":"left_wrist","L_Hand":"left_hand",
+            "R_Thorax":"right_collar","R_Shoulder":"right_shoulder","R_Elbow":"right_elbow","R_Wrist":"right_wrist","R_Hand":"right_hand",
+        }
+
+        humos_idx = {n:i for i,n in enumerate(humos_body_names)}
+        mjcf_to_humos_idx = [humos_idx[mjcf_to_humos[n]] for n in mjcf_body_names]   # len=23
+
         print(f"Loading {len(self.motion_keys)} HUMOS motion file(s) from {self.motion_dir}")
        
         for motion_key in tqdm(self.motion_keys, desc="Loading HUMOS files"):
@@ -137,12 +187,15 @@ class MotionLibHUMOS():
                         if motion_key not in self.motion_key_num_frames:
                             self.motion_key_num_frames[motion_key] = num_frames
                         # or assert they are the same if you want to be strict
+
+                        # pose_body: [T,23,3] (HUMOS order)  ->  pose_body_mjcf: [T,23,3] (MJCF order)
+                        pose_body_mjcf = seq_dict["pose_body"][:, mjcf_to_humos_idx, :]
                         
                         # Store flat dict
                         flat_motion = {
                             "trans":        seq_dict["trans"],
                             "root_orient":  seq_dict.get("root_orient", None),
-                            "pose_body":    seq_dict["pose_body"],
+                            "pose_body":    pose_body_mjcf,
                             "betas":        seq_dict.get("betas", None),       # may be constant or per-frame
                             "joints_pos":   seq_dict.get("joints_pos", None),
                             "offset_height":seq_dict.get("offset_height", 0.0),
@@ -288,34 +341,22 @@ class MotionLibHUMOS():
             aa0 = root_orient[f0]        # [3]
             aa1 = root_orient[f1]        # [3]
 
-            q0 = torch_utils.axis_angle_to_quaternion(aa0)
-
-            # q0 = torch_utils.axis_angle_to_quaternion(aa0.unsqueeze(0)).squeeze(0)  # [4]
-            # q1 = torch_utils.axis_angle_to_quaternion(aa1.unsqueeze(0)).squeeze(0)  # [4]
-            # q_root = issac_utils.slerp(q0, q1, torch.unsqueeze(blend, axis=-1))  # [4]
-            # # root_rot = q_root
-
             # print(aa0)
-            # print(q_root)
-            # print(aa1)
+
+            q0 = torch_utils.axis_angle_to_quaternion(aa0)
+            q0 = q0[:, [1,2,3,0]]
+
+            # print(q0)
             # exit()
 
             # pose_body: [T,23,3] axis-angle
             pb0 = pose_body[f0]                      # [23,3]
             pb1 = pose_body[f1]                      # [23,3]
 
+            # print(pb0.shape)
+            # exit()
+
             pb0 = pb0.reshape(pb0.shape[0], -1)
-
-            # q0 = torch_utils.exp_map_to_quat(pb0.reshape(-1,3)).reshape(23,4)  # [23,4]
-            # q1 = torch_utils.exp_map_to_quat(pb1.reshape(-1,3)).reshape(23,4)  # [23,4]
-
-            # blend_t = torch.full((23,1), blend, device=q0.device, dtype=q0.dtype)  # broadcast
-            # qj = torch_utils.slerp(q0, q1, blend_t)                                 # [23,4]
-
-            # pose_body_t = torch_utils.quat_to_exp_map(qj).reshape(23,3)             # back to axis-angle (exp-map)
-            # # dof_pos = pose_body_t.reshape(-1)  # [69]
-
-
 
         return {
             "root_pos":     p0,
