@@ -17,6 +17,21 @@ from utils.motion_lib_base import MotionLibBase, MotionlibMode, compute_motion_d
 from smpl_sim.smpllib.smpl_parser import SMPL_Parser, SMPLH_Parser, SMPLX_Parser
 
 
+def axis_angle_to_quat_torch(aa: torch.Tensor) -> torch.Tensor:
+    """
+    aa: [..., 3]
+    Returns: [..., 4] xyzw
+    """
+    angle = torch.norm(aa, dim=-1, keepdim=True)
+    axis = aa / (angle + 1e-8)
+    half_angle = angle / 2.0
+    sin_half = torch.sin(half_angle)
+    cos_half = torch.cos(half_angle)
+    quat = torch.cat([axis * sin_half, cos_half], dim=-1)  # xyzw
+    # Fix numerical issues for very small angles
+    quat = torch.where(angle < 1e-6, torch.tensor([0.,0.,0.,1.], device=aa.device), quat)
+    return quat
+
 class MotionLibHUMOS():
     """
     Load HUMOS .pt results and expose the same motion-state API as MotionLibSMPL by
@@ -355,13 +370,22 @@ class MotionLibHUMOS():
 
             # print(pb0.shape)
             # exit()
+            # [1, 23, 4]
+            quat0 = torch_utils.axis_angle_to_quaternion(pb0)
+            quat0 = quat0[:, :,[1,2,3,0]]
 
-            pb0 = pb0.reshape(pb0.shape[0], -1)
+            # [1, 23, 3]
+            dof_pos0 = issac_utils.quat_to_exp_map(quat0)
+
+            # print(dof_pos0.shape)
+            # exit()
+
+            dof_pos0 = dof_pos0.reshape(dof_pos0.shape[0], -1)
 
         return {
             "root_pos":     p0,
             "root_rot":     q0,
-            "dof_pos":      pb0,
+            "dof_pos":      dof_pos0,
             "root_vel":     root_vel,
             "root_ang_vel": root_ang_vel,
             "dof_vel":      dof_vel,

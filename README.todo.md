@@ -1,4 +1,6 @@
-- apply the height offset!
+- apply the height offset!, choose to use phc/humos 
+
+- amass_occlusion in `scripts/data_process/convert_amass_data.py` looks good
 
 
 

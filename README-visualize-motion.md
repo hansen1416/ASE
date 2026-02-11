@@ -9,3 +9,7 @@ python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/
 `
 python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/repos/humos/output/000004_1.pt
 `
+
+`
+python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/a_person_squats_and_rais_male_00c972db.pkl
+`

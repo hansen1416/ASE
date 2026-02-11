@@ -571,6 +571,7 @@ class MotionLibBase():
         return self.num_bodies
 
     def _local_rotation_to_dof_smpl(self, local_rot):
+        # [N, 24, 4]
         B, J, _ = local_rot.shape
         dof_pos = torch_utils.quat_to_exp_map(local_rot[:, 1:])
         return dof_pos.reshape(B, -1)

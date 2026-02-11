@@ -142,7 +142,11 @@ class MotionLibSMPL(MotionLibBase):
                 random_heading_rot = sRot.from_euler("xyz", random_rot)
                 pose_aa[:, :3] = torch.tensor((random_heading_rot * sRot.from_rotvec(pose_aa[:, :3])).as_rotvec())
                 pose_quat_global = (random_heading_rot * sRot.from_quat(pose_quat_global.reshape(-1, 4))).as_quat().reshape(B, J, N)
-                trans = torch.matmul(trans, torch.from_numpy(random_heading_rot.as_matrix().T))
+
+                random_heading_rot = random_heading_rot.as_matrix().T
+                random_heading_rot = random_heading_rot.astype(np.float32, copy=False)
+
+                trans = torch.matmul(trans, torch.from_numpy(random_heading_rot))
             ##### ZL: randomize the heading ######
 
             if not mesh_parsers is None:
