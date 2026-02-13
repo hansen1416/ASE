@@ -120,7 +120,7 @@ class DeviceCache:
 
 
     
-class MotionLibHumos():
+class MotionLibHUMOS():
 
     def __init__(self, motion_lib_cfg):
         self.m_cfg = motion_lib_cfg
@@ -256,7 +256,7 @@ class MotionLibHumos():
             ##### ZL: randomize the heading ######
 
             if not mesh_parsers is None:
-                trans, trans_fix = MotionLibSMPL.fix_trans_height(pose_aa, trans, curr_gender_beta, mesh_parsers, fix_height_mode = fix_height)
+                trans, trans_fix = MotionLibHUMOS.fix_trans_height(pose_aa, trans, curr_gender_beta, mesh_parsers, fix_height_mode = fix_height)
             else:
                 trans_fix = 0
 

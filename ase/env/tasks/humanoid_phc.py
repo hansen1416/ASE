@@ -7,7 +7,7 @@ from easydict import EasyDict
 from isaacgym import gymtorch
 
 from env.tasks.humanoid import Humanoid, dof_to_obs
-from utils.motion_lib_smpl import MotionLibSMPL
+# from utils.motion_lib_smpl import MotionLibSMPL
 from utils.motion_lib_humos import MotionLibHUMOS
 from isaacgym.torch_utils import *
 from poselib.poselib.skeleton.skeleton3d import SkeletonTree
@@ -245,35 +245,17 @@ class HumanoidPHC(Humanoid):
             "key_body_ids": self._key_body_ids
         })
 
-        self._motion_lib = MotionLibSMPL(motion_lib_cfg=motion_lib_cfg)
+        # self._motion_lib = MotionLibSMPL(motion_lib_cfg=motion_lib_cfg)
+
+        # self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
+        #             gender_betas=humanoid_shapes.cpu(), 
+        #             random_sample=True)
+
+        self._motion_lib = MotionLibHUMOS(motion_lib_cfg=motion_lib_cfg)
 
         self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
                     gender_betas=humanoid_shapes.cpu(), 
                     random_sample=True)
-        
-        # motion_dir = "/home/hlz/repos/humos/output"
-        # motion_keys = ["000002"]
-        # _key_body_ids = torch.tensor(range(24), device=self.device)
-
-        # motion_lib_cfg = EasyDict({
-        #     "motion_dir": motion_dir,
-        #     "motion_keys": motion_keys,
-        #     "device": torch.device("cpu"),
-        #     "min_length": -1,
-        #     "max_length": -1,
-        #     "im_eval": True,
-        #     "multi_thread": False,
-        #     "smpl_type": "smplh",
-        #     "randomrize_heading": True,
-        #     "device": self.device,
-        #     "min_length": -1, 
-        #     "step_dt": 1/60,
-        #     "key_body_ids": _key_body_ids
-        # })
-
-        # self._motion_lib = MotionLibHUMOS(cfg=motion_lib_cfg)
-
-        # self._motion_lib.load_motions()
 
         return
     
