@@ -72,7 +72,7 @@ class MotionLibSMPL(MotionLibBase):
     
     @staticmethod
     def fix_trans_height(pose_aa, trans, curr_gender_betas, mesh_parsers, fix_height_mode):
-        if fix_height_mode == FixHeightMode.no_fix:
+        if fix_height_mode == FixHeightMode.no_fix.value:
             return trans, 0
         
         with torch.no_grad():
@@ -85,12 +85,12 @@ class MotionLibSMPL(MotionLibBase):
             
             offset = joints_curr[:, 0] - trans[:frame_check] # account for SMPL root offset. since the root trans we pass in has been processed, we have to "add it back".
 
-            if fix_height_mode == FixHeightMode.ankle_fix:
+            if fix_height_mode == FixHeightMode.ankle_fix.value:
                 assignment_indexes = mesh_parser.lbs_weights.argmax(axis=1)
                 pick = (((assignment_indexes != mesh_parser.joint_names.index("L_Toe")).int() + (assignment_indexes != mesh_parser.joint_names.index("R_Toe")).int() 
                     + (assignment_indexes != mesh_parser.joint_names.index("R_Hand")).int() + + (assignment_indexes != mesh_parser.joint_names.index("L_Hand")).int()) == 4).nonzero().squeeze()
                 diff_fix = ((vertices_curr[:, pick] - offset[:, None])[:frame_check, ..., -1].min(dim=-1).values - height_tolorance).min()  # Only acount the first 30 frames, which usually is a calibration phase.
-            elif fix_height_mode == FixHeightMode.full_fix:
+            elif fix_height_mode == FixHeightMode.full_fix.value:
                 
                 diff_fix = ((vertices_curr - offset[:, None])[:frame_check, ..., -1].min(dim=-1).values - height_tolorance).min()  # Only acount the first 30 frames, which usually is a calibration phase.
             
