@@ -7,9 +7,25 @@ python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/
 `
 
 `
-python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/repos/humos/output/000004_1.pt
+python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/a_person_stumbles_to_the_female_fcc491cd.pkl
 `
 
 `
-python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/a_person_squats_and_rais_male_00c972db.pkl
+python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/with_their_left_hand_th_neutral_74fc526e.pkl
+`
+
+`
+python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/a_person_squats_down_and_neutral_aef91182.pkl
+`
+
+`
+python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/person_waves_with_their_neutral_15c4d2e9.pkl
+`
+
+`
+python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/person_walks_up_and_squa_neutral_5636a12a.pkl
+`
+
+`
+python ase/run.py --task HumanoidViewMotion --num_envs 4 --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/a_person_pats_the_top_of_neutral_31f56211.pkl
 `
