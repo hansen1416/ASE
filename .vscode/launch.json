@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "View amass smpl",
+            "name": "View amass phc",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/ase/run.py",
@@ -14,11 +14,11 @@
                 "--num_envs",
                 "2",
                 "--cfg_env",
-                "ase/data/cfg/humanoid_ase_smpl.yaml",
+                "ase/data/cfg/humanoid_phc.yaml",
                 "--cfg_train",
-                "ase/data/cfg/train/rlg/amp_humanoid.yaml",
+                "ase/data/cfg/train/rlg/phc_humanoid.yaml",
                 "--motion_file",
-                "/home/hlz/datasets/amass-pkls/0-ACCAD_MartialArtsWalksTurns_c3d_E15-blockleftmiddle_poses.pkl",
+                "/home/hlz/datasets/humos_results/a_person_squats_and_rais_male_00c972db.pkl",
             ],
         },
         {

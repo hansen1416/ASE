@@ -47,8 +47,9 @@ class MotionLibSMPL(MotionLibBase):
     def __init__(self, motion_lib_cfg):
         super().__init__(motion_lib_cfg = motion_lib_cfg)
         
-        data_dir = "data/smpl"
-        
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = osp.join(current_dir, "..", "data/smpl")
+
         if osp.exists(data_dir):
             if motion_lib_cfg.smpl_type == "smpl":
                 smpl_parser_n = SMPL_Parser(model_path=data_dir, gender="neutral")
@@ -83,7 +84,7 @@ class MotionLibSMPL(MotionLibBase):
             vertices_curr, joints_curr = mesh_parser.get_joints_verts(pose_aa[:frame_check], betas[None,], trans[:frame_check])
             
             offset = joints_curr[:, 0] - trans[:frame_check] # account for SMPL root offset. since the root trans we pass in has been processed, we have to "add it back".
-            
+
             if fix_height_mode == FixHeightMode.ankle_fix:
                 assignment_indexes = mesh_parser.lbs_weights.argmax(axis=1)
                 pick = (((assignment_indexes != mesh_parser.joint_names.index("L_Toe")).int() + (assignment_indexes != mesh_parser.joint_names.index("R_Toe")).int() 
