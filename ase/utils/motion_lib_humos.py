@@ -50,10 +50,6 @@ class FixHeightMode(Enum):
     full_fix = 1
     ankle_fix = 2
 
-class MotionlibMode(Enum):
-    file = 1
-    directory = 2
-
 
 def local_rotation_to_dof_vel(local_rot0, local_rot1, dt):
     # Assume each joint is 3dof
@@ -130,7 +126,7 @@ class MotionLibHUMOS():
         
         self.mesh_parsers = None
         
-        self.load_data(self.m_cfg.motion_file,  min_length = self.m_cfg.min_length, im_eval = self.m_cfg.im_eval)
+        self.load_data(self.m_cfg.motion_file)
         self.setup_constants(fix_height = self.m_cfg.fix_height,  multi_thread = self.m_cfg.multi_thread)
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -156,39 +152,16 @@ class MotionLibHUMOS():
         
         return
                 
-    def load_data(self, motion_file,  min_length=-1, im_eval = False):
-        if osp.isfile(motion_file):
-            self.mode = MotionlibMode.file.value
-            self._motion_data_load = joblib.load(motion_file)
-        else:
-            self.mode = MotionlibMode.directory.value
-            self._motion_data_load = glob.glob(osp.join(motion_file, "*.pkl"))
-        
-        data_list = self._motion_data_load
+    def load_data(self, motion_file):
 
-        if self.mode == MotionlibMode.file.value:
-            if min_length != -1:
-                data_list = {k: v for k, v in list(self._motion_data_load.items()) if len(v['pose_quat_global']) >= min_length}
-            elif im_eval:
-                data_list = {item[0]: item[1] for item in sorted(self._motion_data_load.items(), key=lambda entry: len(entry[1]['pose_quat_global']), reverse=True)}
-                # data_list = self._motion_data
-            else:
-                data_list = self._motion_data_load
+        self._motion_data_load = glob.glob(osp.join(motion_file, "*.pkl"))
 
-            # dict_keys(['beta', 'trans_orig', 'pose_aa', 'root_trans_offset', 'pose_quat', 'pose_quat_global', 'gender', 'fps'])
-            self._motion_data_list = np.array(list(data_list.values()))
-            # ['with_their_left_hand_th_neutral']
-            self._motion_data_keys = np.array(list(data_list.keys()))
-        else:
-            # when load folders, they are like:
-            # ['/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_00c972db.pkl' '/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_0a1ece18.pkl' '/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_0c3f729e.pkl']
-            self._motion_data_list = np.array(self._motion_data_load)
-            self._motion_data_keys = np.array(self._motion_data_load)
+        # when load folders, they are like:
+        # ['/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_00c972db.pkl' '/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_0a1ece18.pkl' '/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_0c3f729e.pkl']
+        self._motion_data_list = np.array(self._motion_data_load)
+        self._motion_data_keys = np.array(self._motion_data_load)
 
         self._num_unique_motions = len(self._motion_data_list)
-
-        if self.mode == MotionlibMode.directory.value:
-            self._motion_data_load = joblib.load(self._motion_data_load[0]) # set self._motion_data_load to a sample of the data 
 
     def setup_constants(self, fix_height = FixHeightMode.full_fix, multi_thread = True):
         self.fix_height = fix_height
@@ -240,18 +213,18 @@ class MotionLibHUMOS():
             B, J, N = pose_quat_global.shape
 
             ##### ZL: randomize the heading ######
-            # if (not flags.im_eval) and (not flags.test):
-            #     # if True:
-            #     random_rot = np.zeros(3)
-            #     random_rot[2] = np.pi * (2 * np.random.random() - 1.0)
-            #     random_heading_rot = sRot.from_euler("xyz", random_rot)
-            #     pose_aa[:, :3] = torch.tensor((random_heading_rot * sRot.from_rotvec(pose_aa[:, :3])).as_rotvec())
-            #     pose_quat_global = (random_heading_rot * sRot.from_quat(pose_quat_global.reshape(-1, 4))).as_quat().reshape(B, J, N)
+            if (not flags.im_eval) and (not flags.test):
+                # if True:
+                random_rot = np.zeros(3)
+                random_rot[2] = np.pi * (2 * np.random.random() - 1.0)
+                random_heading_rot = sRot.from_euler("xyz", random_rot)
+                pose_aa[:, :3] = torch.tensor((random_heading_rot * sRot.from_rotvec(pose_aa[:, :3])).as_rotvec())
+                pose_quat_global = (random_heading_rot * sRot.from_quat(pose_quat_global.reshape(-1, 4))).as_quat().reshape(B, J, N)
 
-            #     random_heading_rot = random_heading_rot.as_matrix().T
-            #     random_heading_rot = random_heading_rot.astype(np.float32, copy=False)
+                random_heading_rot = random_heading_rot.as_matrix().T
+                random_heading_rot = random_heading_rot.astype(np.float32, copy=False)
 
-            #     trans = torch.matmul(trans, torch.from_numpy(random_heading_rot))
+                trans = torch.matmul(trans, torch.from_numpy(random_heading_rot))
             ##### ZL: randomize the heading ######
 
             if not mesh_parsers is None:
@@ -347,6 +320,8 @@ class MotionLibHUMOS():
         self._curr_motion_ids = sample_idxes
         self.one_hot_motions = torch.nn.functional.one_hot(self._curr_motion_ids, num_classes = self._num_unique_motions).to(self._device)  # Testing for obs_v5
         self.curr_motion_keys = self._motion_data_keys[sample_idxes]
+        
+        # we will apply new sample logic
         self._sampling_batch_prob = self._sampling_prob[self._curr_motion_ids] / self._sampling_prob[self._curr_motion_ids].sum()
 
         print("\n****************************** Current motion keys ******************************")

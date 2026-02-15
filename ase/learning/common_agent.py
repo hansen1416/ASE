@@ -143,7 +143,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                     if self.has_self_play_config:
                         self.self_play_manager.update(self)
 
-                if self.save_freq > 0:
+                if self.save_freq > 0 and self.game_rewards.current_size > 0:
                     if (epoch_num % self.save_freq == 0):
                         
                         # save only if mean reward > 250

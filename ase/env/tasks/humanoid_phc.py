@@ -255,7 +255,7 @@ class HumanoidPHC(Humanoid):
 
         self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
                     gender_betas=humanoid_shapes.cpu(), 
-                    random_sample=True)
+                    random_sample=False)
 
         return
     
