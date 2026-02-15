@@ -133,9 +133,6 @@ class MotionLibHUMOS():
         self.load_data(self.m_cfg.motion_file,  min_length = self.m_cfg.min_length, im_eval = self.m_cfg.im_eval)
         self.setup_constants(fix_height = self.m_cfg.fix_height,  multi_thread = self.m_cfg.multi_thread)
 
-        if flags.real_traj:
-            self.track_idx = self._motion_data_load[next(iter(self._motion_data_load))].get("track_idx", [19, 24, 29])
-        
         current_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = osp.join(current_dir, "..", "data/smpl")
 
@@ -325,8 +322,6 @@ class MotionLibHUMOS():
         if "gts" in self.__dict__:
             del self.gts, self.grs, self.lrs, self.grvs, self.gravs, self.gavs, self.gvs, self.dvs,
             del self._motion_lengths, self._motion_fps, self._motion_dt, self._motion_num_frames, self._motion_bodies, self._motion_aa
-            if flags.real_traj:
-                del self.q_gts, self.q_grs, self.q_gavs, self.q_gvs
 
         motions = []
         self._motion_lengths = []
@@ -336,9 +331,6 @@ class MotionLibHUMOS():
         self._motion_bodies = []
         self._motion_aa = []
         
-        if flags.real_traj:
-            self.q_gts, self.q_grs, self.q_gavs, self.q_gvs = [], [], [], []
-
         torch.cuda.empty_cache()
         gc.collect()
 
@@ -420,13 +412,7 @@ class MotionLibHUMOS():
             self._motion_num_frames.append(num_frames)
             motions.append(curr_motion)
             self._motion_lengths.append(curr_len)
-            
-            if flags.real_traj:
-                self.q_gts.append(curr_motion.quest_motion['quest_trans'])
-                self.q_grs.append(curr_motion.quest_motion['quest_rot'])
-                self.q_gavs.append(curr_motion.quest_motion['global_angular_vel'])
-                self.q_gvs.append(curr_motion.quest_motion['linear_vel'])
-                
+  
             del curr_motion
             
         self._motion_lengths = torch.tensor(self._motion_lengths, device=self._device, dtype=torch.float32)
@@ -448,12 +434,6 @@ class MotionLibHUMOS():
         self.gvs = torch.cat([m.global_velocity for m in motions], dim=0).float().to(self._device)
         self.dvs = torch.cat([m.dof_vels for m in motions], dim=0).float().to(self._device)
         
-        if flags.real_traj:
-            self.q_gts = torch.cat(self.q_gts, dim=0).float().to(self._device)
-            self.q_grs = torch.cat(self.q_grs, dim=0).float().to(self._device)
-            self.q_gavs = torch.cat(self.q_gavs, dim=0).float().to(self._device)
-            self.q_gvs = torch.cat(self.q_gvs, dim=0).float().to(self._device)
-
         lengths = self._motion_num_frames
         lengths_shifted = lengths.roll(1)
         lengths_shifted[0] = 0
@@ -621,29 +601,12 @@ class MotionLibHUMOS():
         body_ang_vel = (1.0 - blend_exp) * body_ang_vel0 + blend_exp * body_ang_vel1
         dof_vel = (1.0 - blend_exp) * dof_vel0 + blend_exp * dof_vel1
 
-
         local_rot = torch_utils.slerp(local_rot0, local_rot1, torch.unsqueeze(blend, axis=-1))
         dof_pos = self._local_rotation_to_dof_smpl(local_rot)
 
         rb_rot0 = self.grs[f0l]
         rb_rot1 = self.grs[f1l]
         rb_rot = torch_utils.slerp(rb_rot0, rb_rot1, blend_exp)
-        
-        if flags.real_traj:
-            q_body_ang_vel0, q_body_ang_vel1 = self.q_gavs[f0l], self.q_gavs[f1l]
-            q_rb_rot0, q_rb_rot1 = self.q_grs[f0l], self.q_grs[f1l]
-            q_rg_pos0, q_rg_pos1 = self.q_gts[f0l, :], self.q_gts[f1l, :]
-            q_body_vel0, q_body_vel1 = self.q_gvs[f0l], self.q_gvs[f1l]
-
-            q_ang_vel = (1.0 - blend_exp) * q_body_ang_vel0 + blend_exp * q_body_ang_vel1
-            q_rb_rot = torch_utils.slerp(q_rb_rot0, q_rb_rot1, blend_exp)
-            q_rg_pos = (1.0 - blend_exp) * q_rg_pos0 + blend_exp * q_rg_pos1
-            q_body_vel = (1.0 - blend_exp) * q_body_vel0 + blend_exp * q_body_vel1
-            
-            rg_pos[:, self.track_idx] = q_rg_pos
-            rb_rot[:, self.track_idx] = q_rb_rot
-            body_vel[:, self.track_idx] = q_body_vel
-            body_ang_vel[:, self.track_idx] = q_ang_vel
 
         key_pos = rg_pos.index_select(dim=-2, index=self.m_cfg.key_body_ids)
 
