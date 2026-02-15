@@ -27,22 +27,22 @@ from smpl_sim.smpllib.smpl_parser import (
 )
 
 
-USE_CACHE = False
+USE_CACHE = True
 print("MOVING MOTION DATA TO GPU, USING CACHE:", USE_CACHE)
 
 
-if not USE_CACHE:
-    old_numpy = torch.Tensor.numpy
+# if not USE_CACHE:
+#     old_numpy = torch.Tensor.numpy
 
-    class Patch:
+#     class Patch:
 
-        def numpy(self):
-            if self.is_cuda:
-                return self.to("cpu").numpy()
-            else:
-                return old_numpy(self)
+#         def numpy(self):
+#             if self.is_cuda:
+#                 return self.to("cpu").numpy()
+#             else:
+#                 return old_numpy(self)
 
-    torch.Tensor.numpy = Patch.numpy
+#     torch.Tensor.numpy = Patch.numpy
 
 
 class FixHeightMode(Enum):
@@ -178,16 +178,18 @@ class MotionLibHUMOS():
             else:
                 data_list = self._motion_data_load
 
-            # dict_keys(['0-ACCAD_Female1Running_c3d_C4 - Run to walk1_poses'])
-            # dict_keys(['pose_quat_global', 'pose_quat', 'trans_orig', 'root_trans_offset', 'beta', 'gender', 'pose_aa', 'fps'])
+            # dict_keys(['beta', 'trans_orig', 'pose_aa', 'root_trans_offset', 'pose_quat', 'pose_quat_global', 'gender', 'fps'])
             self._motion_data_list = np.array(list(data_list.values()))
+            # ['with_their_left_hand_th_neutral']
             self._motion_data_keys = np.array(list(data_list.keys()))
         else:
+            # when load folders, they are like:
+            # ['/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_00c972db.pkl' '/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_0a1ece18.pkl' '/home/hlz/datasets/humos_results/a_man_picks_up_an_unseen_female_0c3f729e.pkl']
             self._motion_data_list = np.array(self._motion_data_load)
             self._motion_data_keys = np.array(self._motion_data_load)
-        
+
         self._num_unique_motions = len(self._motion_data_list)
-        
+
         if self.mode == MotionlibMode.directory.value:
             self._motion_data_load = joblib.load(self._motion_data_load[0]) # set self._motion_data_load to a sample of the data 
 

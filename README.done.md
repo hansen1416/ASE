@@ -44,4 +44,11 @@ Verified the reward is maximum when reset the humanoid.
 
 - it's always Hard Resets to a frame in the target motion, no fail recover
 
+- For training, they state they use AMASS with 480 identities: 274 male and 206 female, and they “concatenate … betas and gender” into the input features. There is no mention of a third “neutral” gender being used as a training category in their data description. So we also use only male and female for training.
 
+- data sampling stratergy:
+    Because each motion key has the *same* set of (N=192) (or 128) morphology variants and the betas are uniformly distributed, we can view the data as samples from a factorized space ((m,a)), where (m) indexes motion content and (a=(g,\beta)) indexes morphology. Our objective is morphology-robust control, i.e.,
+    [
+    \min_\pi\ \mathbb{E}*{m\sim p(m)}\ \mathbb{E}*{a\sim \mathrm{Unif}(\mathcal A)}\big[L(\pi; m,a)\big].
+    ]
+    Using all variants per motion (or sampling uniformly within each motion) yields an unbiased Monte Carlo estimate of this risk, since (|\mathcal A_m|=|\mathcal A|) for all (m) and thus (p(a\mid m)=\mathrm{Unif}(\mathcal A)). This removes motion–morphology confounding and enforces invariance to body shape: the policy must realize the same motion across a broad, uniformly covered morphology set rather than exploiting correlations between particular motions and particular bodies. Consequently, training optimizes the intended average-case performance over morphologies and empirically should improve generalization to held-out shapes relative to unbalanced or morphology-narrow sampling.
