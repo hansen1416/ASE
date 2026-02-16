@@ -54,6 +54,13 @@ class MotionlibMode(Enum):
     file = 1
     directory = 2
 
+def encode_gender(gender_str: str, device='cpu', dtype=torch.float32):
+    if gender_str == 'male':
+        return torch.tensor([1], device=device, dtype=dtype)
+    elif gender_str == 'female':
+        return torch.tensor([-1], device=device, dtype=dtype)
+    
+    return torch.tensor([0], device=device, dtype=dtype)
 
 def local_rotation_to_dof_vel(local_rot0, local_rot1, dt):
     # Assume each joint is 3dof
@@ -149,7 +156,7 @@ class MotionLibHUMOS():
                 smpl_parser_n = SMPLX_Parser(model_path=data_dir, gender="neutral", use_pca=False, create_transl=False, flat_hand_mean = True, num_betas=20)
                 smpl_parser_m = SMPLX_Parser(model_path=data_dir, gender="male", use_pca=False, create_transl=False, flat_hand_mean = True, num_betas=20)
                 smpl_parser_f = SMPLX_Parser(model_path=data_dir, gender="female", use_pca=False, create_transl=False, flat_hand_mean = True, num_betas=20)
-            self.mesh_parsers = {0: smpl_parser_n, 1: smpl_parser_m, 2: smpl_parser_f}
+            self.mesh_parsers = {0: smpl_parser_n, 1: smpl_parser_m, -1: smpl_parser_f}
         else:
             print("SMPL models not found, set mesh_parsers to None")
             self.mesh_parsers = None
@@ -204,7 +211,7 @@ class MotionLibHUMOS():
         
         
     @staticmethod
-    def load_motion_with_skeleton(ids, motion_data_list, skeleton_trees, shape_params, mesh_parsers, config, queue, pid):
+    def load_motion_with_skeleton(ids, motion_data_list, skeleton_trees, mesh_parsers, config, queue, pid):
         # ZL: loading motion with the specified skeleton. Perfoming forward kinematics to get the joint positions
         max_len = config.max_length
         fix_height = config.fix_height
@@ -223,7 +230,10 @@ class MotionLibHUMOS():
             if not isinstance(curr_file, dict) and osp.isfile(curr_file):
                 key = motion_data_list[f].split("/")[-1].split(".")[0]
                 curr_file = joblib.load(curr_file)[key]
-            curr_gender_beta = shape_params[f]
+
+            # we are using SMPL, so the beta is [10,]
+            gender_tensor = encode_gender(curr_file['gender'])
+            curr_gender_beta = torch.cat([gender_tensor.view(1), curr_file['beta']], dim=0)
 
             seq_len = curr_file['root_trans_offset'].shape[0]
             if max_len == -1 or seq_len < max_len:
@@ -240,18 +250,18 @@ class MotionLibHUMOS():
             B, J, N = pose_quat_global.shape
 
             ##### ZL: randomize the heading ######
-            # if (not flags.im_eval) and (not flags.test):
-            #     # if True:
-            #     random_rot = np.zeros(3)
-            #     random_rot[2] = np.pi * (2 * np.random.random() - 1.0)
-            #     random_heading_rot = sRot.from_euler("xyz", random_rot)
-            #     pose_aa[:, :3] = torch.tensor((random_heading_rot * sRot.from_rotvec(pose_aa[:, :3])).as_rotvec())
-            #     pose_quat_global = (random_heading_rot * sRot.from_quat(pose_quat_global.reshape(-1, 4))).as_quat().reshape(B, J, N)
+            if (not flags.im_eval) and (not flags.test):
+                # if True:
+                random_rot = np.zeros(3)
+                random_rot[2] = np.pi * (2 * np.random.random() - 1.0)
+                random_heading_rot = sRot.from_euler("xyz", random_rot)
+                pose_aa[:, :3] = torch.tensor((random_heading_rot * sRot.from_rotvec(pose_aa[:, :3])).as_rotvec())
+                pose_quat_global = (random_heading_rot * sRot.from_quat(pose_quat_global.reshape(-1, 4))).as_quat().reshape(B, J, N)
 
-            #     random_heading_rot = random_heading_rot.as_matrix().T
-            #     random_heading_rot = random_heading_rot.astype(np.float32, copy=False)
+                random_heading_rot = random_heading_rot.as_matrix().T
+                random_heading_rot = random_heading_rot.astype(np.float32, copy=False)
 
-            #     trans = torch.matmul(trans, torch.from_numpy(random_heading_rot))
+                trans = torch.matmul(trans, torch.from_numpy(random_heading_rot))
             ##### ZL: randomize the heading ######
 
             if not mesh_parsers is None:
@@ -264,24 +274,10 @@ class MotionLibHUMOS():
 
             curr_motion = SkeletonMotion.from_skeleton_state(sk_state, curr_file.get("fps", 30))
             curr_dof_vels = compute_motion_dof_vels(curr_motion)
-            
-            if flags.real_traj:
-                quest_sensor_data = to_torch(curr_file['quest_sensor_data'])
-                quest_trans = quest_sensor_data[..., :3]
-                quest_rot = quest_sensor_data[..., 3:]
-                
-                quest_trans[..., -1] -= trans_fix # Fix trans
-                
-                global_angular_vel = SkeletonMotion._compute_angular_velocity(quest_rot, time_delta=1 / curr_file['fps'])
-                linear_vel = SkeletonMotion._compute_velocity(quest_trans, time_delta=1 / curr_file['fps'])
-                quest_motion = {"global_angular_vel": global_angular_vel, "linear_vel": linear_vel, "quest_trans": quest_trans, "quest_rot": quest_rot}
-                curr_motion.quest_motion = quest_motion
 
             curr_motion.dof_vels = curr_dof_vels
             curr_motion.gender_beta = curr_gender_beta
             res[curr_id] = (curr_file, curr_motion)
-            
-            
 
         if not queue is None:
             queue.put(res)
@@ -317,7 +313,7 @@ class MotionLibHUMOS():
             trans[..., -1] -= diff_fix
             return trans, diff_fix
 
-    def load_motions(self, skeleton_trees, gender_betas, random_sample=True, start_idx=0, max_len=-1):
+    def load_motions(self, skeleton_trees, random_sample=True, start_idx=0):
         # load motion load the same number of motions as there are skeletons (humanoids)
         if "gts" in self.__dict__:
             del self.gts, self.grs, self.lrs, self.grvs, self.gravs, self.gavs, self.gvs, self.dvs,
@@ -337,6 +333,8 @@ class MotionLibHUMOS():
         total_len = 0.0
         self.num_joints = len(skeleton_trees[0].node_names)
         num_motion_to_load = len(skeleton_trees)
+
+        # todo, we need to read skeleton_trees for each beta
 
         if random_sample:
             sample_idxes = torch.multinomial(self._sampling_prob, num_samples=num_motion_to_load, replacement=True).to(self._device)
@@ -376,7 +374,7 @@ class MotionLibHUMOS():
         chunk = np.ceil(len(jobs) / num_jobs).astype(int)
         ids = np.arange(len(jobs))
 
-        jobs = [(ids[i:i + chunk], jobs[i:i + chunk], skeleton_trees[i:i + chunk], gender_betas[i:i + chunk],  self.mesh_parsers, self.m_cfg) for i in range(0, len(jobs), chunk)]
+        jobs = [(ids[i:i + chunk], jobs[i:i + chunk], skeleton_trees[i:i + chunk], self.mesh_parsers, self.m_cfg) for i in range(0, len(jobs), chunk)]
         job_args = [jobs[i] for i in range(len(jobs))]
         for i in range(1, len(jobs)):
             worker_args = (*job_args[i], queue, i)

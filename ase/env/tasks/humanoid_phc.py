@@ -253,9 +253,7 @@ class HumanoidPHC(Humanoid):
 
         self._motion_lib = MotionLibHUMOS(motion_lib_cfg=motion_lib_cfg)
 
-        self._motion_lib.load_motions(skeleton_trees=[sk_tree], 
-                    gender_betas=humanoid_shapes.cpu(), 
-                    random_sample=True)
+        self._motion_lib.load_motions(skeleton_trees=[sk_tree], random_sample=True)
 
         return
     

@@ -22,7 +22,7 @@ class HumanoidViewMotion(HumanoidPHC):
         cfg["env"]["controlFrequencyInv"] = 1
         cfg["env"]["pdControl"] = False
 
-        self.target_marker_enabled = True
+        self.target_marker_enabled = False
         self.follow_camera_enabled = True
 
         super().__init__(cfg=cfg,
