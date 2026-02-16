@@ -224,10 +224,10 @@ class HumanoidPHC(Humanoid):
         asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
         sk_tree = SkeletonTree.from_mjcf(asset_file_full)
 
-        gender_beta = np.zeros(17)
-        num_envs = self.cfg["env"]["numEnvs"]
+        # gender_beta = np.zeros(17)
+        # num_envs = self.cfg["env"]["numEnvs"]
 
-        humanoid_shapes = torch.tensor(np.array([gender_beta] * num_envs)).float().to(self.device)
+        # humanoid_shapes = torch.tensor(np.array([gender_beta] * num_envs)).float().to(self.device)
 
         motion_lib_cfg = EasyDict({
             "motion_file": motion_file,
