@@ -16,7 +16,7 @@ import torch
 import torch.multiprocessing as mp
 
 import utils.isaacgym_torch_utils as torch_utils
-from poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
+from poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState, SkeletonTree
 from scipy.spatial.transform import Rotation as sRot
 from utils.flags import flags
 from smpl_sim.utils.torch_ext import to_torch
@@ -143,6 +143,22 @@ class MotionLibHUMOS():
         current_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = osp.join(current_dir, "..", "data/smpl")
 
+        smpl_xml_folder = osp.join(current_dir, "..", "data", "assets", "mjcf", "smpl")
+
+        all_betas = torch.load(osp.join(current_dir, "..", "all_betas.pt"), weights_only=False)
+
+        self.num_joints = None
+
+        self.sk_trees = {}
+
+        for beta_key in all_betas.keys():
+            smpl_xml = os.path.join(smpl_xml_folder, f"{beta_key}_smpl.xml")
+
+            self.sk_trees[beta_key] = SkeletonTree.from_mjcf(smpl_xml)
+
+            if self.num_joints is None:
+                self.num_joints = len(self.sk_trees[beta_key].node_names)
+
         if osp.exists(data_dir):
             if motion_lib_cfg.smpl_type == "smpl":
                 smpl_parser_n = SMPL_Parser(model_path=data_dir, gender="neutral")
@@ -227,6 +243,8 @@ class MotionLibHUMOS():
         for f in pbar:
             curr_id = ids[f]  # id for this datasample
             curr_file = motion_data_list[f]
+
+            # here `curr_file` i the file path
             if not isinstance(curr_file, dict) and osp.isfile(curr_file):
                 key = motion_data_list[f].split("/")[-1].split(".")[0]
                 curr_file = joblib.load(curr_file)[key]
@@ -269,8 +287,11 @@ class MotionLibHUMOS():
             else:
                 trans_fix = 0
 
+            beta_key = curr_file['beta_key']
+            sk_tree = skeleton_trees[beta_key]
+
             pose_quat_global = to_torch(pose_quat_global)
-            sk_state = SkeletonState.from_rotation_and_root_translation(skeleton_trees[f], pose_quat_global, trans, is_local=False)
+            sk_state = SkeletonState.from_rotation_and_root_translation(sk_tree, pose_quat_global, trans, is_local=False)
 
             curr_motion = SkeletonMotion.from_skeleton_state(sk_state, curr_file.get("fps", 30))
             curr_dof_vels = compute_motion_dof_vels(curr_motion)
@@ -313,7 +334,7 @@ class MotionLibHUMOS():
             trans[..., -1] -= diff_fix
             return trans, diff_fix
 
-    def load_motions(self, skeleton_trees, random_sample=True, start_idx=0):
+    def load_motions(self):
         # load motion load the same number of motions as there are skeletons (humanoids)
         if "gts" in self.__dict__:
             del self.gts, self.grs, self.lrs, self.grvs, self.gravs, self.gavs, self.gvs, self.dvs,
@@ -331,32 +352,33 @@ class MotionLibHUMOS():
         gc.collect()
 
         total_len = 0.0
-        self.num_joints = len(skeleton_trees[0].node_names)
-        num_motion_to_load = len(skeleton_trees)
+        # self.num_joints = len(skeleton_trees[0].node_names)
 
-        # todo, we need to read skeleton_trees for each beta
+        # num_motion_to_load = len(skeleton_trees)
 
-        if random_sample:
-            sample_idxes = torch.multinomial(self._sampling_prob, num_samples=num_motion_to_load, replacement=True).to(self._device)
-        else:
-            sample_idxes = torch.remainder(torch.arange(len(skeleton_trees)) + start_idx, self._num_unique_motions ).to(self._device)
+        # if random_sample:
+        #     sample_idxes = torch.multinomial(self._sampling_prob, num_samples=num_motion_to_load, replacement=True).to(self._device)
+        # else:
+        #     sample_idxes = torch.remainder(torch.arange(len(skeleton_trees)) + start_idx, self._num_unique_motions ).to(self._device)
 
-        # import ipdb; ipdb.set_trace()
-        self._curr_motion_ids = sample_idxes
-        self.one_hot_motions = torch.nn.functional.one_hot(self._curr_motion_ids, num_classes = self._num_unique_motions).to(self._device)  # Testing for obs_v5
-        self.curr_motion_keys = self._motion_data_keys[sample_idxes]
-        self._sampling_batch_prob = self._sampling_prob[self._curr_motion_ids] / self._sampling_prob[self._curr_motion_ids].sum()
+        # # import ipdb; ipdb.set_trace()
+        # self._curr_motion_ids = sample_idxes
+        # # self.one_hot_motions = torch.nn.functional.one_hot(self._curr_motion_ids, num_classes = self._num_unique_motions).to(self._device)  # Testing for obs_v5
+        # self.curr_motion_keys = self._motion_data_keys[sample_idxes]
+        # self._sampling_batch_prob = self._sampling_prob[self._curr_motion_ids] / self._sampling_prob[self._curr_motion_ids].sum()
 
-        print("\n****************************** Current motion keys ******************************")
-        print("Sampling motion:", sample_idxes[:30])
-        if len(self.curr_motion_keys) < 100:
-            print(self.curr_motion_keys)
-        else:
-            print(self.curr_motion_keys[:30], ".....")
-        print("*********************************************************************************\n")
+        # print("\n****************************** Current motion keys ******************************")
+        # print("Sampling motion:", sample_idxes[:30])
+        # if len(self.curr_motion_keys) < 100:
+        #     print(self.curr_motion_keys)
+        # else:
+        #     print(self.curr_motion_keys[:30], ".....")
+        # print("*********************************************************************************\n")
 
+        # motion_data_list = self._motion_data_list[sample_idxes.cpu().numpy()]
 
-        motion_data_list = self._motion_data_list[sample_idxes.cpu().numpy()]
+        motion_data_list = self._motion_data_list
+
         torch.set_num_threads(1)
         mp.set_sharing_strategy('file_descriptor')
 
@@ -374,7 +396,7 @@ class MotionLibHUMOS():
         chunk = np.ceil(len(jobs) / num_jobs).astype(int)
         ids = np.arange(len(jobs))
 
-        jobs = [(ids[i:i + chunk], jobs[i:i + chunk], skeleton_trees[i:i + chunk], self.mesh_parsers, self.m_cfg) for i in range(0, len(jobs), chunk)]
+        jobs = [(ids[i:i + chunk], jobs[i:i + chunk], self.sk_trees, self.mesh_parsers, self.m_cfg) for i in range(0, len(jobs), chunk)]
         job_args = [jobs[i] for i in range(len(jobs))]
         for i in range(1, len(jobs)):
             worker_args = (*job_args[i], queue, i)
@@ -516,7 +538,9 @@ class MotionLibHUMOS():
     #     # print("termination history: ", self._termination_history[self._curr_motion_ids])
 
     def sample_motions(self, n):
-        motion_ids = torch.multinomial(self._sampling_batch_prob, num_samples=n, replacement=True).to(self._device)
+        # motion_ids = torch.multinomial(self._sampling_batch_prob, num_samples=n, replacement=True).to(self._device)
+
+        motion_ids = torch.randint(0, 256, (n,), device=self._device, dtype=torch.long)
 
         return motion_ids
 
