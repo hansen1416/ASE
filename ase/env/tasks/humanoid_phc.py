@@ -218,11 +218,11 @@ class HumanoidPHC(Humanoid):
         assert(self._dof_offsets[-1] == self.num_dof)
 
         # multi humanoid template change ===============
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
+        # asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
         # multi humanoid template change ===============
-        asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
-        sk_tree = SkeletonTree.from_mjcf(asset_file_full)
+        # asset_file_full = os.path.join(self.cfg["env"]["asset"]["assetRoot"], asset_file[0])
+        # sk_tree = SkeletonTree.from_mjcf(asset_file_full)
 
         # gender_beta = np.zeros(17)
         # num_envs = self.cfg["env"]["numEnvs"]
@@ -251,7 +251,7 @@ class HumanoidPHC(Humanoid):
         #             gender_betas=humanoid_shapes.cpu(), 
         #             random_sample=True)
 
-        self._motion_lib = MotionLibHUMOS(motion_lib_cfg=motion_lib_cfg)
+        self._motion_lib = MotionLibHUMOS(motion_lib_cfg=motion_lib_cfg, all_betas=self.all_betas)
 
         self._motion_lib.load_motions()
 

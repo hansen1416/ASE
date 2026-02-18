@@ -129,7 +129,7 @@ class DeviceCache:
     
 class MotionLibHUMOS():
 
-    def __init__(self, motion_lib_cfg):
+    def __init__(self, motion_lib_cfg, all_betas):
         self.m_cfg = motion_lib_cfg
         self._sim_fps = 1/self.m_cfg.get("step_dt", 1/30)
         print("SIM FPS:", self._sim_fps)
@@ -145,19 +145,19 @@ class MotionLibHUMOS():
 
         smpl_xml_folder = osp.join(current_dir, "..", "data", "assets", "mjcf", "smpl")
 
-        all_betas = torch.load(osp.join(current_dir, "..", "all_betas.pt"), weights_only=False)
-
         self.num_joints = None
 
-        self.sk_trees = {}
+        self.sk_trees = {'male': {}, 'female': {}}
 
         for beta_key in all_betas.keys():
-            smpl_xml = os.path.join(smpl_xml_folder, f"{beta_key}_smpl.xml")
+            for gender in ['male', 'female']:
 
-            self.sk_trees[beta_key] = SkeletonTree.from_mjcf(smpl_xml)
+                smpl_xml = os.path.join(smpl_xml_folder, f"{gender}_{beta_key}_smpl.xml")
 
-            if self.num_joints is None:
-                self.num_joints = len(self.sk_trees[beta_key].node_names)
+                self.sk_trees[gender][beta_key] = SkeletonTree.from_mjcf(smpl_xml)
+
+                if self.num_joints is None:
+                    self.num_joints = len(self.sk_trees[gender][beta_key].node_names)
 
         if osp.exists(data_dir):
             if motion_lib_cfg.smpl_type == "smpl":
@@ -250,8 +250,12 @@ class MotionLibHUMOS():
                 curr_file = joblib.load(curr_file)[key]
 
             # we are using SMPL, so the beta is [10,]
-            gender_tensor = encode_gender(curr_file['gender'])
+            gender = curr_file['gender']
+            gender_tensor = encode_gender(gender)
             curr_gender_beta = torch.cat([gender_tensor.view(1), curr_file['beta']], dim=0)
+
+            beta_key = curr_file['beta_key']
+            sk_tree = skeleton_trees[gender][beta_key]
 
             seq_len = curr_file['root_trans_offset'].shape[0]
             if max_len == -1 or seq_len < max_len:
@@ -286,9 +290,6 @@ class MotionLibHUMOS():
                 trans, trans_fix = MotionLibHUMOS.fix_trans_height(pose_aa, trans, curr_gender_beta, mesh_parsers, fix_height_mode = fix_height)
             else:
                 trans_fix = 0
-
-            beta_key = curr_file['beta_key']
-            sk_tree = skeleton_trees[beta_key]
 
             pose_quat_global = to_torch(pose_quat_global)
             sk_state = SkeletonState.from_rotation_and_root_translation(sk_tree, pose_quat_global, trans, is_local=False)

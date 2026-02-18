@@ -25,6 +25,13 @@ def mat33_to_np(m):
         [m.z.x, m.z.y, m.z.z],
     ], dtype=np.float32)
 
+def encode_gender(gender_str: str, device='cpu', dtype=torch.float32):
+    if gender_str == 'male':
+        return torch.tensor([1], device=device, dtype=dtype)
+    elif gender_str == 'female':
+        return torch.tensor([-1], device=device, dtype=dtype)
+    
+    return torch.tensor([0], device=device, dtype=dtype)
 
 class Humanoid(BaseTask):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
@@ -64,6 +71,9 @@ class Humanoid(BaseTask):
         # fetures plugin -------------
         self._features = [TargetMarkerFeature(enabled=self.target_marker_enabled), FollowCameraFeature(enabled=self.follow_camera_enabled)]
         # fetures plugin -------------
+
+        self.asset_root = self.cfg["env"]["asset"]["assetRoot"]
+        self.all_betas = torch.load(os.path.join(self.asset_root, self.cfg["env"]["asset"]["assetFileName"]), weights_only=False)
          
         super().__init__(cfg=self.cfg)
         
@@ -209,11 +219,10 @@ class Humanoid(BaseTask):
 
         # height + num_bodies * 15 (pos + vel + rot + ang_vel) - root_pos
         self._num_obs = 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3
-
-        self._num_obs += 10
+        # gender + betas
+        self._num_obs += 11
 
         # load beta into observation ===============
-
         if not self._root_height_obs:
             self._num_obs -= 1
         
@@ -240,21 +249,6 @@ class Humanoid(BaseTask):
         self._termination_heights = to_torch(self._termination_heights, device=self.device)
         return
 
-    def _compute_safe_root_height(self, template_id: int) -> float:
-        """
-        ---- 1211 actions
-        Heuristic: use the first SMPL beta (roughly correlated with height)
-        to scale a base height, then add a small margin. This is just a
-        robust guess; tune coefficients empirically.
-        """
-        betas = self._template_betas[template_id]          # [B]
-        beta_height = float(betas[0].clamp(-3.0, 3.0))     # avoid extremes
-        height_scale = 1.0 + 0.15 * beta_height            # ~±45% over ±3
-        safe_h = self._base_char_height * height_scale + self._spawn_height_margin
-        # avoid silly values
-        safe_h = max(0.4, min(2.0, safe_h))
-        return safe_h
-
     def _create_envs(self, num_envs, spacing, num_per_row):
         # fetures plugin -------------
         for f in self._features: f.on_create_envs(self, num_envs)
@@ -262,9 +256,6 @@ class Humanoid(BaseTask):
 
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
-
-        asset_root = self.cfg["env"]["asset"]["assetRoot"]
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
 
         asset_options = gymapi.AssetOptions()
         asset_options.angular_damping = 0.01
@@ -306,73 +297,65 @@ class Humanoid(BaseTask):
         template_betas = []   # <--- add this
         # load beta into observation ===============
 
-        for i, af in enumerate(asset_file):
+        for beta_key, betas in self.all_betas.items():
+            for gender in ['male', 'female']:
 
-            humanoid_asset = self.gym.load_asset(self.sim, asset_root, af, asset_options)
+                gender_tensor = encode_gender(gender)
+                curr_gender_beta = torch.cat([gender_tensor.view(1), betas], dim=0)
 
-            # load beta into observation ===============
-            # load betas for this template
-            beta_rel_dir = os.path.dirname(af)                       # e.g. "mjcf/smpl"
-            smpl_stem = os.path.splitext(os.path.basename(af))[0]    # "a0f02530_smpl"
-            beta_prefix = smpl_stem.rsplit("_", 1)[0]                 # "a0f02530"
-            beta_filename = beta_prefix + "_betas.pt"                 # "a0f02530_betas.pt"
-            beta_path = os.path.join(asset_root, beta_rel_dir, beta_filename)
+                template_betas.append(curr_gender_beta)
 
-            betas = torch.load(beta_path, weights_only=True)
-            # here the betas should be torch.Size([1, 10])
-            if len(betas.shape) > 1:
-                betas = betas[0]
+                af = os.path.join("mjcf", "smpl", f"{gender}_{beta_key}_smpl.xml")
 
-            betas = torch.as_tensor(betas, dtype=torch.float32, device=self.device)
-            template_betas.append(betas)
-            # load beta into observation ===============
+                humanoid_asset = self.gym.load_asset(self.sim, self.asset_root, af, asset_options)
 
-            actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
-            curr_motor_efforts = [prop.motor_effort for prop in actuator_props]
+                # load beta into observation ===============
+                actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
+                curr_motor_efforts = [prop.motor_effort for prop in actuator_props]
 
-            right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
-            left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
+                right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
+                left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
 
-            sensor_pose = gymapi.Transform()
+                sensor_pose = gymapi.Transform()
 
-            self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
-            self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
+                self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
+                self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
 
-            # sensor_count = self.gym.get_asset_force_sensor_count(humanoid_asset)
-            # if sensors_per_env is None:
-            #     sensors_per_env = sensor_count
-            # elif sensor_count != sensors_per_env:
-            #     raise ValueError("All humanoid assets must expose the same number of force sensors")
+                # sensor_count = self.gym.get_asset_force_sensor_count(humanoid_asset)
+                # if sensors_per_env is None:
+                #     sensors_per_env = sensor_count
+                # elif sensor_count != sensors_per_env:
+                #     raise ValueError("All humanoid assets must expose the same number of force sensors")
 
-            curr_num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
-            curr_num_dof = self.gym.get_asset_dof_count(humanoid_asset)
-            curr_num_joints = self.gym.get_asset_joint_count(humanoid_asset)
+                curr_num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
+                curr_num_dof = self.gym.get_asset_dof_count(humanoid_asset)
+                curr_num_joints = self.gym.get_asset_joint_count(humanoid_asset)
 
-            if i == 0:
-                # the smpl type are of same rigid body and joints, so only take info from the first one
+                if motor_efforts is None:
+                    # the smpl type are of same rigid body and joints, so only take info from the first one
 
-                motor_efforts = curr_motor_efforts
+                    motor_efforts = curr_motor_efforts
 
-                self.max_motor_effort = max(motor_efforts)
-                self.motor_efforts = to_torch(motor_efforts, device=self.device)
+                    self.max_motor_effort = max(motor_efforts)
+                    self.motor_efforts = to_torch(motor_efforts, device=self.device)
 
-                self.torso_index = 0
-                self.num_bodies = curr_num_bodies
-                self.num_dof = curr_num_dof
-                self.num_joints = curr_num_joints
+                    self.torso_index = 0
+                    self.num_bodies = curr_num_bodies
+                    self.num_dof = curr_num_dof
+                    self.num_joints = curr_num_joints
 
-            else:
+                else:
 
-                assert curr_num_bodies == self.num_bodies, f"diff num_bodies: {curr_num_bodies}, {self.num_bodies}, {af}, {i}"
-                assert curr_num_dof == self.num_dof, f"diff num_bodies: {curr_num_dof}, {self.num_dof}"
-                assert curr_num_joints == self.num_joints, f"diff num_bodies: {curr_num_joints}, {self.num_joints}"
+                    assert curr_num_bodies == self.num_bodies, f"diff num_bodies: {curr_num_bodies}, {self.num_bodies}, {af}, {i}"
+                    assert curr_num_dof == self.num_dof, f"diff num_bodies: {curr_num_dof}, {self.num_dof}"
+                    assert curr_num_joints == self.num_joints, f"diff num_bodies: {curr_num_joints}, {self.num_joints}"
 
-                if len(curr_motor_efforts) != len(motor_efforts):
-                    raise ValueError("All humanoid assets must expose the same number of actuators")
-                if not np.allclose(curr_motor_efforts, motor_efforts):
-                    raise ValueError("All humanoid assets must share identical actuator effort limits")
+                    if len(curr_motor_efforts) != len(motor_efforts):
+                        raise ValueError("All humanoid assets must expose the same number of actuators")
+                    if not np.allclose(curr_motor_efforts, motor_efforts):
+                        raise ValueError("All humanoid assets must share identical actuator effort limits")
 
-            humanoid_assets.append(humanoid_asset)
+                humanoid_assets.append(humanoid_asset)
         
         # load beta into observation ===============
         # torch.Size([64, 10])
@@ -413,9 +396,6 @@ class Humanoid(BaseTask):
             self._betas_env[i] = self._template_betas[template_id]
             # load beta into observation ===============
 
-            # ---- 1211 actions new: cache a safe spawn height for this env ---
-            # todo we need do this more percisely, findout the exact height for each humanoid
-            # self._safe_root_heights[i] = self._compute_safe_root_height(template_id)
             # ---------------------------------------------------
 
             self._build_env(i, env_ptr, h_asset)
