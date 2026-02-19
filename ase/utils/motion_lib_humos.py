@@ -264,7 +264,7 @@ class MotionLibHUMOS():
                 start = random.randint(0, seq_len - max_len)
                 end = start + max_len
 
-            trans = curr_file['root_trans_offset'].clone()[start:end]
+            trans = curr_file['trans_orig'].clone()[start:end]
             pose_aa = to_torch(curr_file['pose_aa'][start:end])
             pose_quat_global = curr_file['pose_quat_global'][start:end]
             
@@ -272,18 +272,18 @@ class MotionLibHUMOS():
             B, J, N = pose_quat_global.shape
 
             ##### ZL: randomize the heading ######
-            if (not flags.im_eval) and (not flags.test):
-                # if True:
-                random_rot = np.zeros(3)
-                random_rot[2] = np.pi * (2 * np.random.random() - 1.0)
-                random_heading_rot = sRot.from_euler("xyz", random_rot)
-                pose_aa[:, :3] = torch.tensor((random_heading_rot * sRot.from_rotvec(pose_aa[:, :3])).as_rotvec())
-                pose_quat_global = (random_heading_rot * sRot.from_quat(pose_quat_global.reshape(-1, 4))).as_quat().reshape(B, J, N)
+            # if (not flags.im_eval) and (not flags.test):
+            #     # if True:
+            #     random_rot = np.zeros(3)
+            #     random_rot[2] = np.pi * (2 * np.random.random() - 1.0)
+            #     random_heading_rot = sRot.from_euler("xyz", random_rot)
+            #     pose_aa[:, :3] = torch.tensor((random_heading_rot * sRot.from_rotvec(pose_aa[:, :3])).as_rotvec())
+            #     pose_quat_global = (random_heading_rot * sRot.from_quat(pose_quat_global.reshape(-1, 4))).as_quat().reshape(B, J, N)
 
-                random_heading_rot = random_heading_rot.as_matrix().T
-                random_heading_rot = random_heading_rot.astype(np.float32, copy=False)
+            #     random_heading_rot = random_heading_rot.as_matrix().T
+            #     random_heading_rot = random_heading_rot.astype(np.float32, copy=False)
 
-                trans = torch.matmul(trans, torch.from_numpy(random_heading_rot))
+            #     trans = torch.matmul(trans, torch.from_numpy(random_heading_rot))
             ##### ZL: randomize the heading ######
 
             if not mesh_parsers is None:

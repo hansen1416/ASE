@@ -33,7 +33,7 @@ class HumanoidViewMotion(HumanoidPHC):
                          headless=headless)
         
         num_motions = self._motion_lib.num_motions()
-        self._motion_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
+        self._motion_ids = self._motion_lib.sample_motions(self.num_envs)
         self._motion_ids = torch.remainder(self._motion_ids, num_motions)
 
         return
@@ -54,7 +54,7 @@ class HumanoidViewMotion(HumanoidPHC):
         return 1 # disable self collisions
 
     def _motion_sync(self):
-        num_motions = self._motion_lib.num_motions()
+        # num_motions = self._motion_lib.num_motions()
         motion_ids = self._motion_ids
         motion_times = self.progress_buf * self._motion_dt
 
@@ -95,9 +95,6 @@ class HumanoidViewMotion(HumanoidPHC):
         motion_lengths = self._motion_lib.get_motion_length(self._motion_ids)
         self.reset_buf[:], self._terminate_buf[:] = compute_view_motion_reset(self.reset_buf, motion_lengths, self.progress_buf, self._motion_dt)
         return
-
-    # def _reset_actors(self, env_ids):
-    #     return
 
     def _reset_env_tensors(self, env_ids):
         num_motions = self._motion_lib.num_motions()
