@@ -268,10 +268,8 @@ class MotionLibHUMOS():
             trans = curr_file['trans_orig'].clone()[start:end]
 
             # the up axis is z, this offset_height is calculated during saving humos results 
-            # trans[:, 2] += curr_file['offset_height']
-
-            # adjust the height:
-            # trans -= curr_file['root_trans_offset']
+            # trans[:, 2] += (curr_file['offset_height'] + 0.15)
+            trans[:, 2] += 0.13
 
             pose_aa = to_torch(curr_file['pose_aa'][start:end])
             pose_quat_global = curr_file['pose_quat_global'][start:end]

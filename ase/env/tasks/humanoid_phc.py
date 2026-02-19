@@ -24,6 +24,8 @@ class HumanoidPHC(Humanoid):
         self._reset_default_env_ids = []
         self._reset_ref_env_ids = []
 
+        self.target_marker_enabled = False
+
         super().__init__(cfg=cfg,
                          sim_params=sim_params,
                          physics_engine=physics_engine,

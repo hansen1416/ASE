@@ -9,6 +9,10 @@ python ase/run.py --task HumanoidPHC --cfg_env ase/data/cfg/humanoid_phc.yaml --
 `
 python ase/run.py --task HumanoidPHC --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/amass-pkls/0-ACCAD_Male1General_c3d_GeneralA11-MilitaryCrawlForward_poses.pkl --headless
 `
+
+`
+python ase/run.py --task HumanoidPHC --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/hlz/datasets/humos_results/ --headless
+`
 -----------
 
 
