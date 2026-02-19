@@ -63,7 +63,7 @@ class Humanoid(BaseTask):
         self.cfg["headless"] = headless
 
         if not hasattr(self, "target_marker_enabled"):
-            self.target_marker_enabled = True
+            self.target_marker_enabled = False
 
         if not hasattr(self, "follow_camera_enabled"):
             self.follow_camera_enabled = True
@@ -233,18 +233,12 @@ class Humanoid(BaseTask):
 
     def _build_termination_heights(self):
         head_term_height = 0.3
-        shield_term_height = 0.32
 
         termination_height = self.cfg["env"]["terminationHeight"]
         self._termination_heights = np.array([termination_height] * self.num_bodies)
 
         head_id = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], "head")
         self._termination_heights[head_id] = max(head_term_height, self._termination_heights[head_id])
-
-        asset_file = self.cfg["env"]["asset"]["assetFileName"]
-        if (asset_file == "mjcf/amp_humanoid_sword_shield.xml"):
-            left_arm_id = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], "left_lower_arm")
-            self._termination_heights[left_arm_id] = max(shield_term_height, self._termination_heights[left_arm_id])
         
         self._termination_heights = to_torch(self._termination_heights, device=self.device)
         return
@@ -377,8 +371,8 @@ class Humanoid(BaseTask):
         # load beta into observation ===============
 
         # ---- 1211 actions new: morphology-aware root heights ---
-        self._base_char_height = self.cfg["env"].get("base_char_height", 0.89)
-        self._spawn_height_margin = self.cfg["env"].get("spawn_height_margin", 0.05)
+        # self._base_char_height = self.cfg["env"].get("base_char_height", 0.89)
+        # self._spawn_height_margin = self.cfg["env"].get("spawn_height_margin", 0.05)
         # self._safe_root_heights = torch.zeros(self.num_envs, device=self.device)
         # ---- 1211 actions ------------------------------------------
         
@@ -395,8 +389,6 @@ class Humanoid(BaseTask):
             template_id = i % m
             self._betas_env[i] = self._template_betas[template_id]
             # load beta into observation ===============
-
-            # ---------------------------------------------------
 
             self._build_env(i, env_ptr, h_asset)
             # multi humanoid template change ===============

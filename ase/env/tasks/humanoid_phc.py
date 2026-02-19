@@ -278,6 +278,7 @@ class HumanoidPHC(Humanoid):
             betas = self._betas_env[env_ids]               # [len(env_ids), B]
 
         # optional: simple normalisation to keep magnitudes modest
+        # todo, need a better normalization stratergy
         betas = betas / 3.0
 
         obs = torch.cat([obs, betas], dim=-1)
