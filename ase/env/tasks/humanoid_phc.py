@@ -212,6 +212,9 @@ class HumanoidPHC(Humanoid):
         self._task_obs_v = 7
         self._num_task_obs = 9 * len(key_bodies)   # [Δp_local, Δv_local, p*_rel_local]
         self._num_obs += self._num_task_obs
+
+        # here self._num_obs == 585. 
+        # 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3 + 9 * len(key_bodies)
         # ---- target motion observation ----
 
         return
@@ -270,6 +273,7 @@ class HumanoidPHC(Humanoid):
         return
 
     def _compute_observations(self, env_ids=None, task_obs=None):
+        # [num_env, 358]
         obs = self._compute_humanoid_obs(env_ids)
 
         # load beta into observation ===============
@@ -281,16 +285,19 @@ class HumanoidPHC(Humanoid):
 
         # optional: simple normalisation to keep magnitudes modest
         # todo, need a better normalization stratergy
-        betas = betas / 3.0
+        # betas = betas / 3.0
 
-        obs = torch.cat([obs, betas], dim=-1)
         # torch.Size([num_envs, 358]) -> torch.Size([num_envs, 368]), 10 betas
         # load beta into observation ===============
 
         # ---- target motion observation ----
         if task_obs is not None:
+            # [num_env, 574]
             obs = torch.cat([obs, task_obs], dim=-1)
         # ---- target motion observation ----
+
+        # [num_env, 585]
+        obs = torch.cat([obs, betas], dim=-1)
 
         if (env_ids is None):
             self.obs_buf[:] = obs

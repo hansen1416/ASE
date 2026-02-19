@@ -52,3 +52,5 @@ Verified the reward is maximum when reset the humanoid.
     \min_\pi\ \mathbb{E}*{m\sim p(m)}\ \mathbb{E}*{a\sim \mathrm{Unif}(\mathcal A)}\big[L(\pi; m,a)\big].
     ]
     Using all variants per motion (or sampling uniformly within each motion) yields an unbiased Monte Carlo estimate of this risk, since (|\mathcal A_m|=|\mathcal A|) for all (m) and thus (p(a\mid m)=\mathrm{Unif}(\mathcal A)). This removes motion–morphology confounding and enforces invariance to body shape: the policy must realize the same motion across a broad, uniformly covered morphology set rather than exploiting correlations between particular motions and particular bodies. Consequently, training optimizes the intended average-case performance over morphologies and empirically should improve generalization to held-out shapes relative to unbalanced or morphology-narrow sampling.
+
+- Use humos generate results, use them as target motion for training.

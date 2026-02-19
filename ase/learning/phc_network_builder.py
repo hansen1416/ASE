@@ -50,6 +50,17 @@ class PHCBuilder(network_builder.A2CBuilder):
             return output
 
         def eval_actor(self, obs):
+
+            # humanoid_obs = obs[:, :358]
+            # task_obs = obs[:, 358:574]
+            # gender_betas = obs[:, 574:]
+
+            # print(humanoid_obs.shape)
+            # print(task_obs.shape)
+            # print(gender_betas.shape)
+
+            # exit()
+
             a_out = self.actor_cnn(obs)
             a_out = a_out.contiguous().view(a_out.size(0), -1)
             a_out = self.actor_mlp(a_out)
