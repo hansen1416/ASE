@@ -28,7 +28,35 @@ class PHCBuilder(network_builder.A2CBuilder):
             # This is the place that adds the discriminator on top of the standard actor–critic.
             self._build_disc(amp_input_shape)
 
+            # reduce actor input: 574 = state/task only
+            self._rebuild_actor_trunk(actor_in_dim=574)
+
+            self._build_film_cond()
+
             return
+
+        def _rebuild_actor_trunk(self, actor_in_dim: int):
+            # remember the actor input dim (so eval_actor can slice consistently)
+            self._actor_in_dim = actor_in_dim
+
+            # PHC/ASE typically uses no CNN; treat actor_cnn as identity
+            self.actor_cnn = nn.Identity()
+
+            mlp_args = {
+                "input_size": actor_in_dim,
+                "units": self._actor_units,
+                "activation": self._actor_activation,
+                "dense_func": nn.Linear,
+            }
+            self.actor_mlp = self._build_mlp(**mlp_args)
+
+            # init actor_mlp weights the same way as original MLP
+            mlp_init = self.init_factory.create(**self._actor_initializer)
+            for m in self.actor_mlp.modules():
+                if isinstance(m, nn.Linear):
+                    mlp_init(m.weight)
+                    if m.bias is not None:
+                        torch.nn.init.zeros_(m.bias)
 
         def load(self, params):
             super().load(params)
@@ -36,7 +64,76 @@ class PHCBuilder(network_builder.A2CBuilder):
             self._disc_units = params['disc']['units']
             self._disc_activation = params['disc']['activation']
             self._disc_initializer = params['disc']['initializer']
+
+            self._actor_units = params['mlp']['units']
+            self._actor_activation = params['mlp']['activation']
+            self._actor_initializer = params['mlp']['initializer']
             return
+
+        def _build_film_cond(self):
+            cond_mlp_args = {
+                'input_size' : 11, 
+                'units' : [64, 64], 
+                'activation' : self._actor_activation, 
+                'dense_func' : torch.nn.Linear
+            }
+            self.cond_mlp = self._build_mlp(**cond_mlp_args)
+            
+            film_out_size = sum(2 * u for u in self._actor_units)
+            self.cond_linear = torch.nn.Linear(cond_mlp_args['units'][-1], film_out_size)
+
+            mlp_init = self.init_factory.create(**self._actor_initializer)
+            for m in list(self.cond_mlp.modules()) + [self.cond_linear]:
+                if isinstance(m, nn.Linear):
+                    mlp_init(m.weight)
+                    if getattr(m, "bias", None) is not None:
+                        torch.nn.init.zeros_(m.bias) 
+
+            return
+
+        def _split_film_params(self, cond_out: torch.Tensor):
+            """
+            cond_out: [B, sum_i 2*h_i] where h_i are self._actor_units
+            returns: list of (gamma, beta), each [B, h_i]
+            """
+            film = []
+            pos = 0
+            for h in self._actor_units:
+                h = int(h)
+                gamma = cond_out[:, pos:pos + h]
+                beta  = cond_out[:, pos + h:pos + 2 * h]
+                film.append((gamma, beta))
+                pos += 2 * h
+            return film
+
+
+        def _forward_mlp_with_film(self, mlp: nn.Sequential, x: torch.Tensor, film_params):
+            """
+            Applies FiLM once per Linear-block (Linear + following nonlinearity/modules until next Linear).
+            This matches the intent of your original code (apply modulation after the block),
+            but avoids repeated application on e.g. Dropout.
+            """
+            mods = list(mlp)
+            lin_idx = -1
+            pending_film = False
+
+            for i, layer in enumerate(mods):
+                x = layer(x)
+
+                if isinstance(layer, nn.Linear):
+                    lin_idx += 1
+                    pending_film = True
+
+                # apply FiLM at the end of this Linear-block:
+                # - end of Sequential, or
+                # - next layer starts a new block (next is Linear)
+                next_is_linear = (i + 1 < len(mods)) and isinstance(mods[i + 1], nn.Linear)
+                if pending_film and (i == len(mods) - 1 or next_is_linear):
+                    gamma, beta = film_params[lin_idx]
+                    x = x * gamma + beta
+                    pending_film = False
+
+            return x
 
         def forward(self, obs_dict):
             obs = obs_dict['obs']
@@ -53,18 +150,16 @@ class PHCBuilder(network_builder.A2CBuilder):
 
             # humanoid_obs = obs[:, :358]
             # task_obs = obs[:, 358:574]
-            # gender_betas = obs[:, 574:]
+            state_obs = obs[:, :574]
+            gender_betas = obs[:, 574:]
 
-            # print(humanoid_obs.shape)
-            # print(task_obs.shape)
-            # print(gender_betas.shape)
-
-            # exit()
-
-            a_out = self.actor_cnn(obs)
+            a_out = self.actor_cnn(state_obs)
             a_out = a_out.contiguous().view(a_out.size(0), -1)
-            a_out = self.actor_mlp(a_out)
-                     
+
+            cond_out = self.cond_linear(self.cond_mlp(gender_betas))   # [B, sum 2*h_i]
+            film_params = self._split_film_params(cond_out)           # [(gamma_i, beta_i), ...]
+            a_out = self._forward_mlp_with_film(self.actor_mlp, a_out, film_params)
+
             if self.is_discrete:
                 logits = self.logits(a_out)
                 return logits
