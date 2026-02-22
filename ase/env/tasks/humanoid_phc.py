@@ -39,7 +39,7 @@ class HumanoidPHC(Humanoid):
         
         self._amp_obs_demo_buf = None
 
-        self.reward_specs = cfg["env"].get("reward_specs", {"k_pos": 100, "k_rot": 10, "k_vel": 0.1, "k_ang_vel": 0.1, "w_pos": 0.5, "w_rot": 0.3, "w_vel": 0.1, "w_ang_vel": 0.1})
+        self.reward_specs = {"k_pos": 50, "k_rot": 30, "k_vel": 0.1, "k_ang_vel": 0.1, "w_pos": 0.5, "w_rot": 0.3, "w_vel": 0.1, "w_ang_vel": 0.1}
 
         self.power_reward = True
         self.reward_raw = torch.zeros((self.num_envs, 5 if self.power_reward else 4)).to(self.device)

@@ -150,7 +150,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                         mr = np.mean(mean_rewards) # an average across value heads
                         mr = float(mr.item() if hasattr(mr, "item") else mr)
 
-                        if mr > 250.0:
+                        if mr > 30.0:
                             self.save(model_output_file + '_' + str(epoch_num))
 
                             if (self._save_intermediate):

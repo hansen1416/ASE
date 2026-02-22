@@ -77,6 +77,9 @@ env:
     dynamicFriction: 1.0
     restitution: 0.0
 
+  power_reward: True
+  power_coefficient: 0.0005
+
 sim:
   substeps: 2
   physx:
