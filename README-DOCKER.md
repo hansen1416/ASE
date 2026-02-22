@@ -2,6 +2,8 @@ Following instruction in `PHC/docs/docker_instruction.MD`
 
 ---
 
+cd /home/
+
 git clone https://github.com/hansen1416/ASE.git
 
 cd /home/ASE/
@@ -10,6 +12,8 @@ chmod -R 777 output/
 
 
 scp -i ~/.ssh/id_ed25519 /home/hlz/datasets/humos_results.zip root@202.181.159.138:/home/ASE
+
+apt install zip unzip
 
 
 -----------------------------
@@ -43,3 +47,9 @@ hansen1416/phc \
 tail -f /dev/null
 
 docker exec -it <CONTAINER_ID> /bin/bash
+
+
+---------------
+
+
+python ase/run.py --task HumanoidPHC --cfg_env ase/data/cfg/humanoid_phc.yaml --cfg_train ase/data/cfg/train/rlg/phc_humanoid.yaml --motion_file /home/gymuser/ASE/humos_results/ --headless
