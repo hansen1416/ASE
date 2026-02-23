@@ -267,9 +267,10 @@ class MotionLibHUMOS():
 
             trans = curr_file['trans_orig'].clone()[start:end]
 
+            # todo, find the proper height offset for each humanoid
             # the up axis is z, this offset_height is calculated during saving humos results 
             # trans[:, 2] += (curr_file['offset_height'] + 0.15)
-            trans[:, 2] += 0.13
+            trans[:, 2] += 0.1
 
             pose_aa = to_torch(curr_file['pose_aa'][start:end])
             pose_quat_global = curr_file['pose_quat_global'][start:end]
@@ -548,7 +549,8 @@ class MotionLibHUMOS():
     def sample_motions(self, n):
         # motion_ids = torch.multinomial(self._sampling_batch_prob, num_samples=n, replacement=True).to(self._device)
 
-        motion_ids = torch.randint(0, 256, (n,), device=self._device, dtype=torch.long)
+        # motion_ids = torch.randint(0, 256, (n,), device=self._device, dtype=torch.long)
+        motion_ids = torch.zeros(n, device=self._device, dtype=torch.long)
 
         return motion_ids
 
