@@ -23,7 +23,7 @@ class HumanoidViewMotion(HumanoidPHC):
         cfg["env"]["pdControl"] = False
 
         self.target_marker_enabled = False
-        self.follow_camera_enabled = True
+        self.follow_camera_enabled = False
 
         super().__init__(cfg=cfg,
                          sim_params=sim_params,
@@ -49,7 +49,7 @@ class HumanoidViewMotion(HumanoidPHC):
         super().post_physics_step()
 
         # if just want to visualize the humanodid model, see if they are stable, comment out this line.
-        self._motion_sync()
+        # self._motion_sync()
         return
     
     def _get_humanoid_collision_filter(self):

@@ -6,9 +6,7 @@ cd /home/
 
 git clone https://github.com/hansen1416/ASE.git
 
-cd /home/ASE/
-mkdir output
-chmod -R 777 output/
+cd /home/ASE/ && mkdir output && chmod -R 777 output/
 
 
 scp -i ~/.ssh/id_ed25519 /home/hlz/datasets/humos_results.zip root@202.181.159.138:/home/ASE
