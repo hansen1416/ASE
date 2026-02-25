@@ -47,6 +47,8 @@ class HumanoidViewMotion(HumanoidPHC):
 
     def post_physics_step(self):
         super().post_physics_step()
+
+        # if just want to visualize the humanodid model, see if they are stable, comment out this line.
         self._motion_sync()
         return
     
