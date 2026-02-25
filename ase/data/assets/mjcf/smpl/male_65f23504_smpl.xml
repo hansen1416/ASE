@@ -69,22 +69,22 @@
         <joint name="Torso_x" type="hinge" pos="0 0 0" axis="1 0 0" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
         <joint name="Torso_y" type="hinge" pos="0 0 0" axis="0 1 0" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
         <joint name="Torso_z" type="hinge" pos="0 0 0" axis="0 0 1" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
-        <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="0.0197 0.0032 0.0912 0.0131 0.0021 0.0608" size="0.0835" name="Torso"/>
+        <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="0.0197 0.0032 0.0912 0.0131 0.0021 0.0608" size="0.077655" name="Torso"/>
         <body name="Spine" pos="0.0328 0.0053 0.1519">
           <joint name="Spine_x" type="hinge" pos="0 0 0" axis="1 0 0" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
           <joint name="Spine_y" type="hinge" pos="0 0 0" axis="0 1 0" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
           <joint name="Spine_z" type="hinge" pos="0 0 0" axis="0 0 1" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
-          <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="0.0024 -0.0017 0.0372 0.0016 -0.0012 0.0248" size="0.0825" name="Spine"/>
+          <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="0.0024 -0.0017 0.0372 0.0016 -0.0012 0.0248" size="0.076725" name="Spine"/>
           <body name="Chest" pos="0.0039 -0.0029 0.0621">
             <joint name="Chest_x" type="hinge" pos="0 0 0" axis="1 0 0" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
             <joint name="Chest_y" type="hinge" pos="0 0 0" axis="0 1 0" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
             <joint name="Chest_z" type="hinge" pos="0 0 0" axis="0 0 1" stiffness="1000" damping="100" armature="0.02" range="-180.0000 180.0000"/>
-            <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="-0.0149 -0.0049 0.0930 -0.0100 -0.0033 0.0620" size="0.1056" name="Chest"/>
+            <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="-0.0149 -0.0049 0.0930 -0.0100 -0.0033 0.0620" size="0.098208" name="Chest"/>
             <body name="Neck" pos="-0.0308 -0.0136 0.2254">
               <joint name="Neck_x" type="hinge" pos="0 0 0" axis="1 0 0" stiffness="500" damping="50" armature="0.02" range="-180.0000 180.0000"/>
               <joint name="Neck_y" type="hinge" pos="0 0 0" axis="0 1 0" stiffness="500" damping="50" armature="0.02" range="-180.0000 180.0000"/>
               <joint name="Neck_z" type="hinge" pos="0 0 0" axis="0 0 1" stiffness="500" damping="50" armature="0.02" range="-180.0000 180.0000"/>
-              <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="0.0110 0.0019 0.0195 0.0440 0.0075 0.0781" size="0.0469" name="Neck"/>
+              <geom type="capsule" contype="1" conaffinity="1" density="500" fromto="0.0110 0.0019 0.0195 0.0440 0.0075 0.0781" size="0.043617" name="Neck"/>
               <body name="Head" pos="0.055 0.0093 0.0977">
                 <joint name="Head_x" type="hinge" pos="0 0 0" axis="1 0 0" stiffness="500" damping="50" armature="0.02" range="-180.0000 180.0000"/>
                 <joint name="Head_y" type="hinge" pos="0 0 0" axis="0 1 0" stiffness="500" damping="50" armature="0.02" range="-180.0000 180.0000"/>

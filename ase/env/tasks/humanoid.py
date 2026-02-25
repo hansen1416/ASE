@@ -378,7 +378,7 @@ class Humanoid(BaseTask):
         if USER == "hlz":
             # when batch = 1, there are 3 humanoids unstable.
             # when batch = 3, there are 1 humanoids unstable.
-            batch_id = 1
+            batch_id = 3
 
             start = batch_id * self.num_envs
 
