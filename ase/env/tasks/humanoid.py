@@ -376,8 +376,7 @@ class Humanoid(BaseTask):
 
         # local batch testing ===============
         if USER == "hlz":
-            # when batch = 1, there are 3 humanoids unstable.
-            # when batch = 3, there are 1 humanoids unstable.
+            # change batch id to load differnt batches
             batch_id = 0
 
             start = batch_id * self.num_envs
