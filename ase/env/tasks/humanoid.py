@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import torch
+import getpass
 
 from isaacgym import gymtorch
 from isaacgym import gymapi
@@ -10,6 +11,8 @@ from utils import torch_utils
 from env.tasks.base_task import BaseTask
 from env.features.target_marker import TargetMarkerFeature
 from env.features.follow_camera import FollowCameraFeature
+
+USER = getpass.getuser()
 
 SMPL_MUJOCO_NAMES = ['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 
                      'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Hand']
@@ -370,29 +373,58 @@ class Humanoid(BaseTask):
         self._betas_env = torch.zeros(self.num_envs, beta_dim, device=self.device)
         # load beta into observation ===============
 
-        # ---- 1211 actions new: morphology-aware root heights ---
-        # self._base_char_height = self.cfg["env"].get("base_char_height", 0.89)
-        # self._spawn_height_margin = self.cfg["env"].get("spawn_height_margin", 0.05)
-        # self._safe_root_heights = torch.zeros(self.num_envs, device=self.device)
-        # ---- 1211 actions ------------------------------------------
-        
-        for i in range(self.num_envs):
-            # create env instance
-            env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
-            # multi humanoid template change ===============
-            m = len(humanoid_assets)
 
-            h_asset = humanoid_assets[i % m]
+        # local batch testing ===============
+        if USER == "hlz":
+            # when batch = 1, there are 3 humanoids unstable.
+            # when batch = 3, there are 1 humanoids unstable.
+            batch_id = 1
 
-            # load beta into observation ===============
-            # assign beta for this env when smpl is used
-            template_id = i % m
-            self._betas_env[i] = self._template_betas[template_id]
-            # load beta into observation ===============
+            start = batch_id * self.num_envs
 
-            self._build_env(i, env_ptr, h_asset)
-            # multi humanoid template change ===============
-            self.envs.append(env_ptr)
+            for i in range(self.num_envs):
+                # create env instance
+                env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
+                # multi humanoid template change ===============
+                m = len(humanoid_assets)
+
+                asset_idx = start + i
+
+                if asset_idx >= m:
+                    asset_idx = asset_idx % m
+
+                h_asset = humanoid_assets[asset_idx]
+
+                # load beta into observation ===============
+                # assign beta for this env when smpl is used
+                self._betas_env[i] = self._template_betas[asset_idx]
+                # load beta into observation ===============
+
+                self._build_env(i, env_ptr, h_asset)
+                # multi humanoid template change ===============
+                self.envs.append(env_ptr)
+            
+        # local batch testing ===============
+        else:
+            for i in range(self.num_envs):
+                # create env instance
+                env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
+                # multi humanoid template change ===============
+                m = len(humanoid_assets)
+
+                h_asset = humanoid_assets[i % m]
+
+                # load beta into observation ===============
+                # assign beta for this env when smpl is used
+                template_id = i % m
+                self._betas_env[i] = self._template_betas[template_id]
+                # load beta into observation ===============
+
+                self._build_env(i, env_ptr, h_asset)
+                # multi humanoid template change ===============
+                self.envs.append(env_ptr)
+
+        print(f"Loaded {torch_utils.count_unique_tensors_approx_abs(self._betas_env)} unique gender beta combination")
 
         # collect per-actor dof limits (lower, upper already corrected for swapped bounds)
         dof_lowers_all = []
@@ -427,11 +459,7 @@ class Humanoid(BaseTask):
         segmentation_id = 0
 
         start_pose = gymapi.Transform()
-        char_h = 0.9
-
-        # ---- 1211 morphology-aware spawn height ---
-        # char_h = float(self._safe_root_heights[env_id]) + 0.1
-        # --------------------------------------
+        char_h = 1.3
 
         start_pose.p = gymapi.Vec3(*get_axis_params(char_h, self.up_axis_idx))
         start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)

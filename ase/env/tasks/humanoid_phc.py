@@ -396,13 +396,6 @@ class HumanoidPHC(Humanoid):
         # root_pos = root_pos + global_offset
         # ---- target motion observation ----
 
-        # ---- 1211 --- enforce morphology-aware safe height on z ---
-        # safe_h = self._safe_root_heights[env_ids].unsqueeze(-1)  # [N, 1]
-        # z = root_pos[:, 2:3]
-        # root_pos = root_pos.clone()
-        # root_pos[:, 2:3] = torch.maximum(z, safe_h)
-        # -------------------------------------------------
-
         # set env actor state
         self._humanoid_root_states[env_ids, 0:3] = root_pos
         self._humanoid_root_states[env_ids, 3:7] = root_rot

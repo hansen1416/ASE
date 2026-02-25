@@ -1,3 +1,5 @@
+- load 128 of humanoid, see if their betas covers them all.
+
 - build a class to verify static humanoid models
 
 - /humanoid_phc.py: computes *imitation reward* (compute_imitation_reward) + optional power penalty; writes rew_buf`

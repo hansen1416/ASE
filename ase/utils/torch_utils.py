@@ -152,3 +152,27 @@ def calc_heading_quat_inv(q):
 
     heading_q = quat_from_angle_axis(-heading, axis)
     return heading_q
+
+
+def count_unique_tensors_approx_abs(tensors, eps: float = 1e-6) -> int:
+    """
+    Count approximately-unique tensors using absolute-tolerance quantization.
+
+    Assumptions:
+      - tensors is a list/iterable of torch.Tensor
+      - all tensors have the same shape
+      - float64 (or any float type); comparison is approximate via quantization
+
+    Two tensors are treated as equal if they quantize to the same integer grid
+    defined by `eps` (roughly: per-element differences <~ eps/2 collapse).
+    """
+    if eps <= 0:
+        raise ValueError("eps must be > 0")
+    if len(tensors) == 0:
+        return 0
+
+    # stack -> quantize -> unique rows
+    X = torch.stack([t.detach() for t in tensors], dim=0)   # [N, ...]
+    Q = torch.round(X / eps).to(torch.int64)
+    Q2 = Q.reshape(Q.size(0), -1)                           # [N, D]
+    return int(torch.unique(Q2, dim=0).size(0))
