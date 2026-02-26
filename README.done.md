@@ -54,3 +54,10 @@ Verified the reward is maximum when reset the humanoid.
     Using all variants per motion (or sampling uniformly within each motion) yields an unbiased Monte Carlo estimate of this risk, since (|\mathcal A_m|=|\mathcal A|) for all (m) and thus (p(a\mid m)=\mathrm{Unif}(\mathcal A)). This removes motion–morphology confounding and enforces invariance to body shape: the policy must realize the same motion across a broad, uniformly covered morphology set rather than exploiting correlations between particular motions and particular bodies. Consequently, training optimizes the intended average-case performance over morphologies and empirically should improve generalization to held-out shapes relative to unbalanced or morphology-narrow sampling.
 
 - Use humos generate results, use them as target motion for training.
+
+- We finally fixed the unstable humanoid issue by adding these 2 lines:
+    compiler = self.tree.getroot().find("compiler")
+    compiler.attrib["coordinate"]     = "local"
+    compiler.attrib["angle"]          = "radian"
+    in `load_from_skeleton` in `smpl_sim/smpllib/smpl_local_robot.py` after `self.tree = parse(...)`.
+    The likely reason is: "Similarly, if angle is missing or not "radian", any range/axis values might be silently parsed in degrees → completely wrong joint limits and initial poses."
